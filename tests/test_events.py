@@ -40,6 +40,7 @@ def test_single_steady_line_is_one_event() -> None:
     # stabilization costs one sample on the start
     assert events[0].start == pytest.approx(1.25)
     assert events[0].end == pytest.approx(1.0 + 7 / FPS)
+    assert events[0].bbox == (5, 15, 10, 50)  # the text_a region
 
 
 def test_text_change_with_no_gap_splits_events() -> None:

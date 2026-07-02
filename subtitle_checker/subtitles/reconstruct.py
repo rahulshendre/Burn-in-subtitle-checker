@@ -68,8 +68,28 @@ def reconstruct_subtitles(
     subtitles = []
     for raw in detect_raw_events(video, fps, band_top, threshold):
         band = extract_band_frame(video, raw.mid, band_top)
-        text, confidence = engine.read(band)
+        text, confidence = engine.read(_crop_to_text(band, raw.bbox))
         subtitles.append(
             SubtitleEvent(start=raw.start, end=raw.end, text=text, confidence=confidence)
         )
     return subtitles
+
+
+# native-resolution pixels of context left around the text crop
+_CROP_PAD = 12
+
+
+def _crop_to_text(band, bbox, detection_width: int = 640):
+    """Crop the native band to the event's text bbox so OCR never sees the
+    bright scenery (sequins, jewellery) around the subtitle."""
+    if bbox is None:
+        return band
+    scale = band.shape[1] / detection_width
+    r0, r1, c0, c1 = (int(v * scale) for v in bbox)
+    r0 = max(r0 - _CROP_PAD, 0)
+    r1 = min(r1 + _CROP_PAD, band.shape[0])
+    c0 = max(c0 - _CROP_PAD, 0)
+    c1 = min(c1 + _CROP_PAD, band.shape[1])
+    if r1 <= r0 or c1 <= c0:
+        return band
+    return band[r0:r1, c0:c1]
