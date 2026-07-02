@@ -18,7 +18,7 @@ from subtitle_checker.subtitles.events import (
     detect_events,
     presence_fraction,
 )
-from subtitle_checker.subtitles.masks import binarize
+from subtitle_checker.subtitles.masks import text_mask
 from subtitle_checker.subtitles.ocr import EasyOcrEngine, OcrEngine
 from subtitle_checker.subtitles.sampler import (
     DEFAULT_BAND_TOP,
@@ -39,12 +39,12 @@ def detect_raw_events(
     kwargs = {} if threshold is None else {"threshold": threshold}
 
     presence = presence_fraction(
-        binarize(frame, **kwargs) for _, frame in iter_band_frames(video, fps, band_top)
+        text_mask(frame, **kwargs) for _, frame in iter_band_frames(video, fps, band_top)
     )
     chrome = chrome_mask(presence)
 
     events = detect_events(
-        ((t, binarize(frame, **kwargs)) for t, frame in iter_band_frames(video, fps, band_top)),
+        ((t, text_mask(frame, **kwargs)) for t, frame in iter_band_frames(video, fps, band_top)),
         chrome=chrome,
     )
     # very long "events" are disclaimers or missed chrome, not dialogue

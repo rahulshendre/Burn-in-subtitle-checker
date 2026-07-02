@@ -73,7 +73,9 @@ def iter_band_frames(
     crop_h, y = band_crop(info.height, band_top)
     out_h = int(crop_h * out_width / info.width)
     out_h -= out_h % 2
-    vf = f"crop=iw:{crop_h}:0:{y},fps={fps},scale={out_width}:{out_h}"
+    # neighbor scaling keeps text pixels at full brightness; bilinear would
+    # average thin anti-aliased strokes down below the binarize threshold
+    vf = f"crop=iw:{crop_h}:0:{y},fps={fps},scale={out_width}:{out_h}:flags=neighbor"
     cmd = [
         "ffmpeg",
         "-v",
