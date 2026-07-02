@@ -1,3 +1,7 @@
-# Runtime dependencies arrive pinned together with the module that uses them
-# (e.g. the OCR engine lands with the subtitles/ stage), so reviewers can see
-# exactly which dependency serves which stage. Nothing required yet.
+# Runtime dependencies arrive pinned together with the module that uses them,
+# so reviewers can see exactly which dependency serves which stage.
+#
+# ffmpeg + ffprobe are required system binaries (frame sampling, burning).
+
+numpy>=1.26,<3        # mask math (subtitles stage)
+easyocr==1.7.2        # OCR engine (subtitles stage); pulls torch
