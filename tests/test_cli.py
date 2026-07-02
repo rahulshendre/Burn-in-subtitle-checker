@@ -18,5 +18,6 @@ def test_no_command_prints_help_and_succeeds(capsys: pytest.CaptureFixture) -> N
     assert "check" in capsys.readouterr().out
 
 
-def test_check_is_a_stub_for_now(capsys: pytest.CaptureFixture) -> None:
-    assert main(["check", "--video", "clip.mp4"]) == 2
+def test_check_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:
+    assert main(["check", "--video", "no_such_clip.mp4"]) == 2
+    assert "not found" in capsys.readouterr().err

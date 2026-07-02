@@ -29,13 +29,36 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "check":
-        print(
-            "Pipeline stages are landing in separate PRs; nothing to run yet.",
-            file=sys.stderr,
-        )
-        return 2
+        return _run_check(args)
 
     parser.print_help()
+    return 0
+
+
+def _run_check(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    video = Path(args.video)
+    if not video.exists():
+        print(f"video not found: {video}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.subtitles.ocr import EasyOcrEngine
+    from subtitle_checker.subtitles.reconstruct import reconstruct_subtitles
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    events = reconstruct_subtitles(video, engine=EasyOcrEngine([args.lang]))
+    artifact = out_dir / f"{video.stem}_subtitle_events.json"
+    save_artifact(artifact, "subtitle_events", events)
+
+    readable = sum(1 for e in events if e.text.strip())
+    print(f"{len(events)} subtitle events ({readable} with text) -> {artifact}")
+    for event in events:
+        text = event.text.strip() or "<unreadable>"
+        print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
     return 0
 
 
