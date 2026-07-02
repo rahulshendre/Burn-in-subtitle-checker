@@ -1,0 +1,3 @@
+# Runtime dependencies arrive pinned together with the module that uses them
+# (e.g. the OCR engine lands with the subtitles/ stage), so reviewers can see
+# exactly which dependency serves which stage. Nothing required yet.
