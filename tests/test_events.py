@@ -37,7 +37,8 @@ def test_single_steady_line_is_one_event() -> None:
     masks = [blank()] * 4 + [text_a()] * 8 + [blank()] * 4
     events = detect_events(stream(masks))
     assert len(events) == 1
-    assert events[0].start == pytest.approx(1.0)
+    # stabilization costs one sample on the start
+    assert events[0].start == pytest.approx(1.25)
     assert events[0].end == pytest.approx(1.0 + 7 / FPS)
 
 
@@ -70,6 +71,18 @@ def test_tiny_noise_is_not_text() -> None:
     assert detect_events(stream([noise] * 8)) == []
 
 
+def test_moving_sparkle_is_killed_by_stabilization() -> None:
+    # 200 px of bright "sequins" that shift every frame — enough pixels to
+    # pass the text minimum, but never stable across two frames
+    masks = []
+    for i in range(12):
+        mask = blank()
+        col = (25 * i) % 80  # jumps far enough that frames never overlap
+        mask[2:12, col : col + 20] = True
+        masks.append(mask)
+    assert detect_events(stream(masks)) == []
+
+
 def test_chrome_pixels_are_ignored() -> None:
     bug = blank()
     bug[0:6, 88:100] = True  # persistent corner bug, 72 px
@@ -88,7 +101,7 @@ def test_chrome_pixels_are_ignored() -> None:
 
     events = detect_events(stream(masks), chrome=chrome)
     assert len(events) == 1
-    assert events[0].start == pytest.approx(2.0)
+    assert events[0].start == pytest.approx(2.25)
 
 
 def test_presence_fraction_requires_frames() -> None:

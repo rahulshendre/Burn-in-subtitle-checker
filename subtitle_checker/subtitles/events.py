@@ -69,12 +69,20 @@ def detect_events(
     same_event_iou: float = SAME_EVENT_IOU,
     min_text_pixels: int = MIN_TEXT_PIXELS,
     min_event_s: float = MIN_EVENT_S,
+    stabilize: bool = True,
 ) -> list[RawEvent]:
-    """One pass over (time, mask) pairs → raw subtitle events."""
+    """One pass over (time, mask) pairs → raw subtitle events.
+
+    With ``stabilize``, each mask is ANDed with the previous frame's raw
+    mask: subtitle text persists across frames while sequins, jewellery and
+    other bright sparkle move every frame — the AND keeps the text and kills
+    the flicker (costs one sample of latency on event starts).
+    """
     events: list[RawEvent] = []
     current_start: float | None = None
     reference: np.ndarray | None = None
     prev_t: float | None = None
+    prev_raw: np.ndarray | None = None
 
     def close(end: float) -> None:
         nonlocal current_start, reference
@@ -85,6 +93,11 @@ def detect_events(
     for t, mask in frames:
         if chrome is not None:
             mask = np.logical_and(mask, np.logical_not(chrome))
+        if stabilize:
+            raw = mask
+            if prev_raw is not None:
+                mask = np.logical_and(mask, prev_raw)
+            prev_raw = raw
         has_text = int(mask.sum()) >= min_text_pixels
 
         if not has_text:
