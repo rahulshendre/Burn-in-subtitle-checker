@@ -8,10 +8,12 @@ version = "0.1.0"
 description = "Flags mismatches between audio dialogue and burned-in subtitles in video files"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["numpy>=1.26,<3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
+# OCR pulls in torch (~2 GB) — separate extra so CI and audio-only work skip it
+ocr = ["easyocr==1.7.2"]
 
 [project.scripts]
 subtitle-checker = "subtitle_checker.cli:main"
