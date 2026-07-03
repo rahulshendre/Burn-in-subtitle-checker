@@ -44,11 +44,17 @@ def events_to_ass(
     font: str = DEFAULT_FONT,
     font_size: int = 52,
     play_res: tuple[int, int] = (1280, 720),
+    margin_v: int = 40,
 ) -> str:
-    """Render subtitle events as an ASS script (white text, bottom-centred)."""
+    """Render subtitle events as an ASS script (white text, bottom-centred).
+
+    ``margin_v`` is the distance from the bottom edge in PlayRes pixels;
+    broadcast footage often has a news-style ticker hugging the bottom, so
+    tests can raise the subtitles clear of it (or drop them into it).
+    """
     style = (
         f"Style: Default,{font},{font_size},&H00FFFFFF,&H00000000,&H00000000,"
-        "0,2,0,2,40,40,40"
+        f"0,2,0,2,40,40,{margin_v}"
     )
     header = [
         "[Script Info]",
@@ -75,6 +81,7 @@ def burn_subtitles(
     events: list[SubtitleEvent],
     out: Path,
     font: str = DEFAULT_FONT,
+    margin_v: int = 40,
 ) -> Path:
     """Re-encode ``video`` with ``events`` rendered as burned-in subtitles."""
     video = Path(video).resolve()
@@ -82,7 +89,8 @@ def burn_subtitles(
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         ass_path = Path(tmp) / "burn.ass"
-        ass_path.write_text(events_to_ass(events, font=font), encoding="utf-8")
+        script = events_to_ass(events, font=font, margin_v=margin_v)
+        ass_path.write_text(script, encoding="utf-8")
         cmd = [
             "ffmpeg",
             "-y",

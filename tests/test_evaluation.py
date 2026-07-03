@@ -203,3 +203,8 @@ class TestAssRendering:
         assert "{test}" not in script
         assert "(test)" in script
         assert "back" in script and "\\slash" not in script
+
+    def test_margin_v_lands_in_style(self) -> None:
+        script = events_to_ass([SubtitleEvent(0.0, 1.0, "ऊपर")], margin_v=110)
+        style = next(line for line in script.splitlines() if line.startswith("Style:"))
+        assert style.endswith(",40,40,110")
