@@ -84,6 +84,23 @@ def test_moving_sparkle_is_killed_by_stabilization() -> None:
     assert detect_events(stream(masks)) == []
 
 
+def test_scrolling_ticker_stays_out_of_bbox() -> None:
+    # steady subtitle line with a news-style ticker scrolling underneath:
+    # the ticker is text-shaped and passes every per-frame gate, but no
+    # pixel of it stays lit for the whole event
+    masks = []
+    for i in range(12):
+        mask = text_a()
+        col = (90 - 7 * i) % 80
+        mask[17:19, col : col + 14] = True  # drifting ticker chunk
+        masks.append(mask)
+    events = detect_events(stream(masks))
+    assert len(events) == 1
+    r0, r1, _, _ = events[0].bbox
+    assert r1 <= 15  # ticker rows 17-19 excluded, subtitle rows kept
+    assert r0 == 5
+
+
 def test_chrome_pixels_are_ignored() -> None:
     bug = blank()
     bug[0:6, 88:100] = True  # persistent corner bug, 72 px
