@@ -21,6 +21,14 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
     check.add_argument("--out", default="out", help="Directory for artifacts and the report")
 
+    ev = subparsers.add_parser(
+        "eval-detection",
+        help="Burn known lines onto a clean clip and measure what Stage 1 detects back",
+    )
+    ev.add_argument("--clean-clip", required=True, help="Video with no burned-in subtitles")
+    ev.add_argument("--lang", default="hi", help="ISO language code for OCR")
+    ev.add_argument("--out", default="out", help="Directory for the burned clip")
+
     return parser
 
 
@@ -30,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(args)
+    if args.command == "eval-detection":
+        return _run_eval_detection(args)
 
     parser.print_help()
     return 0
@@ -59,6 +69,38 @@ def _run_check(args: argparse.Namespace) -> int:
     for event in events:
         text = event.text.strip() or "<unreadable>"
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
+    return 0
+
+
+def _run_eval_detection(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    clip = Path(args.clean_clip)
+    if not clip.exists():
+        print(f"video not found: {clip}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.evaluation.detection import evaluate_detection
+    from subtitle_checker.subtitles.ocr import EasyOcrEngine
+
+    report = evaluate_detection(clip, Path(args.out), engine=EasyOcrEngine([args.lang]))
+
+    for m in report.matches:
+        print(
+            f"MATCH {m.truth.start:6.2f}-{m.truth.end:6.2f} -> "
+            f"{m.detected.start:6.2f}-{m.detected.end:6.2f}  sim={m.similarity:.2f}"
+        )
+        print(f"      truth: {m.truth.text}")
+        print(f"      ocr:   {m.detected.text}")
+    for tr in report.missed:
+        print(f"MISS  {tr.start:6.2f}-{tr.end:6.2f}  {tr.text}")
+    for d in report.strays:
+        print(f"STRAY {d.start:6.2f}-{d.end:6.2f}  [{d.confidence:.2f}] {d.text!r}")
+
+    print(f"\nrecall: {len(report.matches)}/{report.truth_count}")
+    print(f"mean text similarity: {report.mean_similarity:.3f}")
+    print(f"mean |start error|: {report.mean_start_error:.2f}s")
+    print(f"mean |end error|:   {report.mean_end_error:.2f}s")
     return 0
 
 
