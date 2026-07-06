@@ -59,41 +59,59 @@ class Defect:
         return EXPECTED_VERDICT[self.type]
 
 
-def plan_defects(
-    events: list[SubtitleEvent], seed: int = 0
-) -> tuple[list[SubtitleEvent], list[Defect]]:
-    """Plant one defect of each type; return (mutated events, defect labels).
+# Defects that mutate one existing line in place; EXTRA_LINE is planted separately.
+_SINGLE_LINE_TYPES = (DefectType.WORD_SWAP, DefectType.TIMING_SHIFT, DefectType.DROP_LINE)
 
-    Victim lines are chosen with a seeded RNG so the same input always yields
-    the same test video.
+
+def plan_defects(
+    events: list[SubtitleEvent],
+    seed: int = 0,
+    types: list[DefectType] | None = None,
+) -> tuple[list[SubtitleEvent], list[Defect]]:
+    """Plant one defect of each requested type; return (mutated events, labels).
+
+    ``types`` selects which defects to plant (default: all of them) — a later
+    stage's eval can ask for only the defects it is meant to catch. Victim lines
+    are chosen with a seeded RNG so the same input always yields the same test
+    video; with the full set the choice is identical to planting them directly.
     """
     if len(events) < 4:
         raise ValueError("need at least 4 subtitle events to plant all defect types")
 
+    requested = list(types) if types is not None else list(DefectType)
+    single = [t for t in _SINGLE_LINE_TYPES if t in requested]
+
     rng = random.Random(seed)
     mutated = [SubtitleEvent(e.start, e.end, e.text, e.confidence) for e in events]
-    swap_i, shift_i, drop_i = rng.sample(range(len(mutated)), 3)
+    victim = dict(zip(single, rng.sample(range(len(mutated)), len(single))))
 
-    defects = [
-        _swap_word(rng, mutated, swap_i),
-        _shift_timing(rng, mutated, shift_i),
-    ]
-    extra_event, extra_defect = _make_extra_line(rng, truth=events, occupied=mutated)
-    defects.append(extra_defect)
+    defects: list[Defect] = []
+    if DefectType.WORD_SWAP in requested:
+        defects.append(_swap_word(rng, mutated, victim[DefectType.WORD_SWAP]))
+    if DefectType.TIMING_SHIFT in requested:
+        defects.append(_shift_timing(rng, mutated, victim[DefectType.TIMING_SHIFT]))
 
-    dropped = mutated[drop_i]
-    defects.append(
-        Defect(
-            type=DefectType.DROP_LINE,
-            start=dropped.start,
-            end=dropped.end,
-            original_text=dropped.text,
-            mutated_text="",
+    extra_event = None
+    if DefectType.EXTRA_LINE in requested:
+        extra_event, extra_defect = _make_extra_line(rng, truth=events, occupied=mutated)
+        defects.append(extra_defect)
+
+    if DefectType.DROP_LINE in requested:
+        # delete last so the in-place mutations above keep their indices valid
+        dropped = mutated[victim[DefectType.DROP_LINE]]
+        defects.append(
+            Defect(
+                type=DefectType.DROP_LINE,
+                start=dropped.start,
+                end=dropped.end,
+                original_text=dropped.text,
+                mutated_text="",
+            )
         )
-    )
-    del mutated[drop_i]
+        del mutated[victim[DefectType.DROP_LINE]]
 
-    mutated.append(extra_event)
+    if extra_event is not None:
+        mutated.append(extra_event)
     mutated.sort(key=lambda e: e.start)
     return mutated, defects
 

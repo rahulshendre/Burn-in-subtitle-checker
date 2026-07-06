@@ -104,6 +104,23 @@ class TestPlanDefects:
         )
         assert in_gap
 
+    def test_types_subset_plants_only_requested(self) -> None:
+        truth = make_truth()
+        mutated, defects = plan_defects(
+            truth, seed=1, types=[DefectType.DROP_LINE, DefectType.EXTRA_LINE]
+        )
+        assert sorted(d.type.value for d in defects) == sorted(
+            [DefectType.DROP_LINE.value, DefectType.EXTRA_LINE.value]
+        )
+        # one line dropped, one added -> count unchanged
+        assert len(mutated) == len(truth)
+
+    def test_full_set_matches_untyped_default(self) -> None:
+        truth = make_truth()
+        assert plan_defects(truth, seed=5) == plan_defects(
+            truth, seed=5, types=list(DefectType)
+        )
+
     def test_too_few_events_rejected(self) -> None:
         with pytest.raises(ValueError, match="at least 4"):
             plan_defects(make_truth(n=3))
