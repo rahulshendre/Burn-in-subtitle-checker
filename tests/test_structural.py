@@ -65,9 +65,9 @@ def test_partial_speech_overlap_clears_subtitle() -> None:
 
 
 def test_missing_flag_spans_only_the_uncovered_gap() -> None:
-    # speech 2-8, subtitle covers 2-5, so 5-8 is the missing stretch
+    # speech 2-8, subtitle covers 2-5 (+0.5s pad), so 5.5-8 is the missing stretch
     events = [SubtitleEvent(2.0, 5.0, "पहला भाग")]
     regions = [AudioRegion(2.0, 8.0, AudioKind.SPEECH)]
     missing = _verdicts(check_structural(events, regions), Verdict.MISSING_SUBTITLE)
     assert len(missing) == 1
-    assert (missing[0].start, missing[0].end) == (5.0, 8.0)
+    assert (missing[0].start, missing[0].end) == (5.5, 8.0)

@@ -18,9 +18,15 @@ from __future__ import annotations
 
 from subtitle_checker.artifacts import AudioKind, AudioRegion, CheckResult, SubtitleEvent, Verdict
 
-# Shortest stretch of uncovered speech worth flagging — below this it is a
-# breath, a stray "hmm", or VAD jitter, not a dropped line.
-MIN_UNCOVERED_SPEECH_S = 0.5
+# Shortest stretch of uncovered speech worth flagging. A real dropped line is a
+# whole utterance; below this it is a breath, a between-lines pause, or VAD
+# jitter. Set from real footage: on a clean serial (Mann Atisunder) every
+# sub-2s "gap" was a false alarm at a subtitle boundary, not a missing line.
+MIN_UNCOVERED_SPEECH_S = 2.0
+# Grace added to each subtitle span before measuring coverage. Consecutive
+# subtitles blink off for a fraction of a second while the speech runs on;
+# without this every line transition reads as missing speech.
+COVER_PAD_S = 0.5
 # A subtitle counts as having dialogue if at least this fraction of its span
 # overlaps speech. Low on purpose: any real speech under it clears it.
 SPEECH_COVER_MIN = 0.3
@@ -91,8 +97,9 @@ def check_structural(
                 )
             )
 
-    # MISSING — speech the subtitles never cover.
-    covers = [(e.start, e.end) for e in events]
+    # MISSING — speech the subtitles never cover. Each subtitle is padded so a
+    # brief blink between consecutive lines does not read as a gap in coverage.
+    covers = [(e.start - COVER_PAD_S, e.end + COVER_PAD_S) for e in events]
     for region in regions:
         if region.kind is not AudioKind.SPEECH:
             continue
