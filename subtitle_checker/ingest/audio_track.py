@@ -34,4 +34,6 @@ def extract_audio(video: Path, sample_rate: int = SAMPLE_RATE) -> np.ndarray:
         "-",
     ]
     proc = subprocess.run(cmd, capture_output=True, check=True)
-    return np.frombuffer(proc.stdout, dtype=np.float32)
+    # frombuffer is a read-only view of the pipe bytes; copy so downstream
+    # consumers (torch tensors, in-place ops) get a writable, owned array
+    return np.frombuffer(proc.stdout, dtype=np.float32).copy()
