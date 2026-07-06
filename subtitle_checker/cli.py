@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from subtitle_checker import __version__
 
@@ -54,8 +55,6 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_check(args: argparse.Namespace) -> int:
-    from pathlib import Path
-
     video = Path(args.video)
     if not video.exists():
         print(f"video not found: {video}", file=sys.stderr)
@@ -77,12 +76,38 @@ def _run_check(args: argparse.Namespace) -> int:
     for event in events:
         text = event.text.strip() or "<unreadable>"
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
+
+    _run_audio_checks(video, events, out_dir)
     return 0
 
 
-def _run_eval_detection(args: argparse.Namespace) -> int:
-    from pathlib import Path
+def _run_audio_checks(video: Path, events: list, out_dir: Path) -> None:
+    """Stage 2: label the audio and raise the structural flags."""
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.audio.regions import label_regions
+    from subtitle_checker.ingest.audio_track import extract_audio
+    from subtitle_checker.match.structural import check_structural
 
+    try:
+        from subtitle_checker.audio.vad import SileroVad
+        vad = SileroVad()
+        audio = extract_audio(video)
+        regions = label_regions(audio, vad)
+    except ImportError:
+        print("audio stage skipped — install the extra with: pip install '.[audio]'")
+        return
+
+    save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
+    flags = check_structural(events, regions)
+    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", flags)
+
+    print(f"\n{len(flags)} structural flag(s):")
+    for f in flags:
+        text = f.subtitle_text.strip() or "<no subtitle>"
+        print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
+
+
+def _run_eval_detection(args: argparse.Namespace) -> int:
     clip = Path(args.clean_clip)
     if not clip.exists():
         print(f"video not found: {clip}", file=sys.stderr)
