@@ -16,6 +16,9 @@ dev = ["pytest>=8.0", "ruff>=0.5"]
 ocr = ["easyocr==1.7.2"]
 # VAD also rides on torch — its own extra so OCR-only work skips it
 audio = ["silero-vad>=5.1"]
+# Forced alignment rides on torchaudio + uroman (romanizes Indic text for the
+# Latin MMS dictionary) — its own extra so OCR/VAD-only work skips the download
+align = ["torchaudio>=2.1", "uroman>=1.2"]
 
 [project.scripts]
 subtitle-checker = "subtitle_checker.cli:main"
