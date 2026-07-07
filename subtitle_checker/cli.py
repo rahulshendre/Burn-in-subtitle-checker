@@ -10,6 +10,8 @@ from subtitle_checker import __version__
 
 # uroman (used by the forced aligner) wants ISO 639-3; the CLI speaks 639-1.
 _UROMAN_LANG = {"hi": "hin", "kn": "kan", "mr": "mar"}
+# Sarvam wants BCP-47 codes; the CLI speaks 639-1.
+_SARVAM_LANG = {"hi": "hi-IN", "kn": "kn-IN", "mr": "mr-IN"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,6 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--video", required=True, help="Path to the input video")
     check.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
     check.add_argument("--out", default="out", help="Directory for artifacts and the report")
+    check.add_argument(
+        "--asr",
+        action="store_true",
+        help="Also run the Sarvam ASR cross-check for word-level errors (needs SARVAM_API_KEY)",
+    )
 
     ev = subparsers.add_parser(
         "eval-detection",
@@ -91,12 +98,12 @@ def _run_check(args: argparse.Namespace) -> int:
         text = event.text.strip() or "<unreadable>"
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
 
-    _run_audio_checks(video, events, out_dir, args.lang)
+    _run_audio_checks(video, events, out_dir, args.lang, args.asr)
     return 0
 
 
-def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str) -> None:
-    """Stage 2 + 3: label the audio, raise structural flags, align the text."""
+def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_asr: bool) -> None:
+    """Stage 2 + 3: label the audio, raise structural flags, check the words."""
     from subtitle_checker.artifacts import save_artifact
     from subtitle_checker.audio.regions import label_regions
     from subtitle_checker.ingest.audio_track import extract_audio
@@ -114,6 +121,9 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str) -> No
     save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
     flags = check_structural(events, regions)
     flags += _alignment_flags(events, audio, regions, lang)
+    if run_asr:
+        seen = {(f.start, f.end) for f in flags}
+        flags += [f for f in _asr_flags(events, audio, regions, lang) if (f.start, f.end) not in seen]
     flags.sort(key=lambda f: f.start)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", flags)
 
@@ -135,6 +145,23 @@ def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
         print("alignment stage skipped — install the extra with: pip install '.[align]'")
         return []
     return check_alignment(scores, regions)
+
+
+def _asr_flags(events: list, audio, regions: list, lang: str) -> list:
+    """Stage 3 secondary: transcribe each line's audio and compare the words."""
+    import os
+
+    if not os.environ.get("SARVAM_API_KEY"):
+        print("ASR cross-check skipped — set SARVAM_API_KEY to enable it")
+        return []
+    from subtitle_checker.match.asr import SarvamAsr, check_asr
+
+    try:
+        engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+        return check_asr(events, audio, regions, engine)
+    except ImportError:
+        print("ASR cross-check skipped — install the extra with: pip install '.[asr]'")
+        return []
 
 
 def _run_eval_detection(args: argparse.Namespace) -> int:
