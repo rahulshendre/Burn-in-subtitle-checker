@@ -6,12 +6,12 @@ from subtitle_checker.artifacts import AudioKind, AudioRegion, Verdict
 from subtitle_checker.match.align import AlignmentScore
 from subtitle_checker.match.verdicts import check_alignment
 
-SPEECH = [AudioRegion(0.0, 5.0, AudioKind.SPEECH)]
-MUSIC = [AudioRegion(0.0, 5.0, AudioKind.MUSIC)]
+SPEECH = [AudioRegion(0.0, 6.0, AudioKind.SPEECH)]
+MUSIC = [AudioRegion(0.0, 6.0, AudioKind.MUSIC)]
 
 
-def _score(score, ocr_confidence=0.9, text="यह बात है") -> AlignmentScore:
-    return AlignmentScore(1.0, 3.0, text, ocr_confidence, score, 1.0, 3.0)
+def _score(score, ocr_confidence=0.9, start=1.0, end=3.0, text="यह बात है") -> AlignmentScore:
+    return AlignmentScore(start, end, text, ocr_confidence, score, start, end)
 
 
 def test_low_score_over_speech_is_text_mismatch() -> None:
@@ -31,19 +31,21 @@ def test_event_without_speech_is_left_to_structural() -> None:
     assert check_alignment([_score(0.1)], MUSIC) == []
 
 
-def test_low_ocr_confidence_is_uncheckable_not_mismatch() -> None:
-    results = check_alignment([_score(0.1, ocr_confidence=0.2)], SPEECH)
-    assert len(results) == 1
-    assert results[0].verdict is Verdict.UNCHECKABLE
+def test_low_ocr_confidence_abstains() -> None:
+    # garbled OCR scores low too, so a low score here is not evidence — no flag
+    assert check_alignment([_score(0.1, ocr_confidence=0.2)], SPEECH) == []
 
 
-def test_unalignable_none_score_over_speech_is_uncheckable() -> None:
-    results = check_alignment([_score(None)], SPEECH)
-    assert len(results) == 1
-    assert results[0].verdict is Verdict.UNCHECKABLE
+def test_unalignable_none_score_abstains() -> None:
+    assert check_alignment([_score(None)], SPEECH) == []
+
+
+def test_short_line_low_score_abstains() -> None:
+    # a 0.6 s line aligns unreliably low even when correct — must not be flagged
+    assert check_alignment([_score(0.1, start=1.0, end=1.6)], SPEECH) == []
 
 
 def test_threshold_is_precision_first() -> None:
-    # just above the cut clears; just below trips it
+    # just above the cut clears; just below trips it (on a long-enough line)
     assert check_alignment([_score(0.31)], SPEECH) == []
     assert check_alignment([_score(0.29)], SPEECH)[0].verdict is Verdict.TEXT_MISMATCH
