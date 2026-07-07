@@ -8,6 +8,9 @@ from pathlib import Path
 
 from subtitle_checker import __version__
 
+# uroman (used by the forced aligner) wants ISO 639-3; the CLI speaks 639-1.
+_UROMAN_LANG = {"hi": "hin", "kn": "kan", "mr": "mar"}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -88,12 +91,12 @@ def _run_check(args: argparse.Namespace) -> int:
         text = event.text.strip() or "<unreadable>"
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
 
-    _run_audio_checks(video, events, out_dir)
+    _run_audio_checks(video, events, out_dir, args.lang)
     return 0
 
 
-def _run_audio_checks(video: Path, events: list, out_dir: Path) -> None:
-    """Stage 2: label the audio and raise the structural flags."""
+def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str) -> None:
+    """Stage 2 + 3: label the audio, raise structural flags, align the text."""
     from subtitle_checker.artifacts import save_artifact
     from subtitle_checker.audio.regions import label_regions
     from subtitle_checker.ingest.audio_track import extract_audio
@@ -110,12 +113,28 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path) -> None:
 
     save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
     flags = check_structural(events, regions)
+    flags += _alignment_flags(events, audio, regions, lang)
+    flags.sort(key=lambda f: f.start)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", flags)
 
-    print(f"\n{len(flags)} structural flag(s):")
+    print(f"\n{len(flags)} flag(s):")
     for f in flags:
         text = f.subtitle_text.strip() or "<no subtitle>"
         print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
+
+
+def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
+    """Stage 3: score each speech-covered line's text against the audio."""
+    from subtitle_checker.match.align import MmsAligner, score_events
+    from subtitle_checker.match.verdicts import check_alignment
+
+    try:
+        aligner = MmsAligner(lang=_UROMAN_LANG.get(lang, "hin"))
+        scores = score_events(events, audio, aligner)
+    except ImportError:
+        print("alignment stage skipped — install the extra with: pip install '.[align]'")
+        return []
+    return check_alignment(scores, regions)
 
 
 def _run_eval_detection(args: argparse.Namespace) -> int:
@@ -163,10 +182,6 @@ def _run_eval_structural(args: argparse.Namespace) -> int:
     for name, ts in sorted(score.by_type.items()):
         print(f"  {name:12} caught {ts.caught}/{ts.planted}, verdict ok {ts.verdict_correct}")
     return 0
-
-
-# uroman wants ISO 639-3; the CLI speaks the 639-1 codes used elsewhere.
-_UROMAN_LANG = {"hi": "hin", "kn": "kan", "mr": "mar"}
 
 
 def _run_eval_alignment(args: argparse.Namespace) -> int:
