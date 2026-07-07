@@ -43,6 +43,38 @@ def _kind_overlap(event: SubtitleEvent, regions: list[AudioRegion], kind: AudioK
     return sum(_overlap(event.start, event.end, r.start, r.end) for r in regions if r.kind is kind)
 
 
+def _merge_missing(
+    flags: list[CheckResult], events: list[SubtitleEvent]
+) -> list[CheckResult]:
+    """Collapse consecutive MISSING flags into one span.
+
+    One unsubtitled stretch of speech gets fragmented when the VAD splits it
+    across regions (a breath or a bar of music between clauses) — that should
+    read as a single missing line, not several. Two flags are merged when they
+    overlap or when nothing but the gap sits between them; a *subtitle* in the
+    gap means they are genuinely separate drops and they stay apart.
+    """
+    if not flags:
+        return flags
+    ordered = sorted(flags, key=lambda r: r.start)
+    merged: list[CheckResult] = [ordered[0]]
+    for flag in ordered[1:]:
+        prev = merged[-1]
+        subtitle_between = any(
+            _overlap(prev.end, flag.start, e.start, e.end) > 0 for e in events
+        )
+        if flag.start <= prev.end or not subtitle_between:
+            merged[-1] = CheckResult(
+                start=prev.start,
+                end=max(prev.end, flag.end),
+                verdict=Verdict.MISSING_SUBTITLE,
+                reason=prev.reason,
+            )
+        else:
+            merged.append(flag)
+    return merged
+
+
 def _uncovered(
     start: float, end: float, covers: list[tuple[float, float]]
 ) -> list[tuple[float, float]]:
@@ -100,12 +132,13 @@ def check_structural(
     # MISSING — speech the subtitles never cover. Each subtitle is padded so a
     # brief blink between consecutive lines does not read as a gap in coverage.
     covers = [(e.start - COVER_PAD_S, e.end + COVER_PAD_S) for e in events]
+    missing: list[CheckResult] = []
     for region in regions:
         if region.kind is not AudioKind.SPEECH:
             continue
         for gap_start, gap_end in _uncovered(region.start, region.end, covers):
             if gap_end - gap_start >= MIN_UNCOVERED_SPEECH_S:
-                results.append(
+                missing.append(
                     CheckResult(
                         start=gap_start,
                         end=gap_end,
@@ -113,6 +146,7 @@ def check_structural(
                         reason="speech present with no subtitle on screen",
                     )
                 )
+    results.extend(_merge_missing(missing, events))
 
     results.sort(key=lambda r: r.start)
     return results

@@ -71,3 +71,30 @@ def test_missing_flag_spans_only_the_uncovered_gap() -> None:
     missing = _verdicts(check_structural(events, regions), Verdict.MISSING_SUBTITLE)
     assert len(missing) == 1
     assert (missing[0].start, missing[0].end) == (5.5, 8.0)
+
+
+def test_fragmented_missing_speech_merges_to_one_flag() -> None:
+    # one unsubtitled stretch, VAD split by a bar of music — no subtitle anywhere
+    events: list[SubtitleEvent] = []
+    regions = [
+        AudioRegion(0.0, 5.0, AudioKind.SPEECH),
+        AudioRegion(5.0, 6.0, AudioKind.MUSIC),
+        AudioRegion(6.0, 11.0, AudioKind.SPEECH),
+    ]
+    missing = _verdicts(check_structural(events, regions), Verdict.MISSING_SUBTITLE)
+    assert len(missing) == 1
+    assert (missing[0].start, missing[0].end) == (0.0, 11.0)
+
+
+def test_separate_drops_with_subtitle_between_stay_apart() -> None:
+    # a real subtitle sits between the two uncovered speech stretches
+    events = [SubtitleEvent(5.0, 6.0, "बीच की पंक्ति")]
+    regions = [
+        AudioRegion(0.0, 4.0, AudioKind.SPEECH),
+        AudioRegion(4.0, 4.5, AudioKind.SILENCE),
+        AudioRegion(4.5, 6.5, AudioKind.SPEECH),  # covered by the subtitle
+        AudioRegion(6.5, 7.0, AudioKind.SILENCE),
+        AudioRegion(7.0, 11.0, AudioKind.SPEECH),
+    ]
+    missing = _verdicts(check_structural(events, regions), Verdict.MISSING_SUBTITLE)
+    assert len(missing) == 2
