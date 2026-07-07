@@ -46,18 +46,19 @@ def test_one_wrong_word_drops_the_score() -> None:
     assert swapped.score < 0.7  # a single swap is separable from a clean line
 
 
-def test_empty_text_scores_zero_over_event_span() -> None:
+def test_empty_text_is_unalignable() -> None:
+    # no words to align → None (UNCHECKABLE), not a zero-score mismatch
     event = SubtitleEvent(3.0, 4.0, "")
     result = score_event(event, AUDIO, FakeAligner())
-    assert result.score == 0.0
+    assert result.score is None
     assert (result.aligned_start, result.aligned_end) == (3.0, 4.0)
 
 
-def test_window_beyond_audio_end_scores_zero() -> None:
-    # event past the 10 s clip → empty window → no spans, honest zero
+def test_window_beyond_audio_end_is_unalignable() -> None:
+    # event past the 10 s clip → empty window → no spans → None, not zero
     event = SubtitleEvent(50.0, 52.0, "बहुत दूर")
     result = score_event(event, AUDIO, FakeAligner())
-    assert result.score == 0.0
+    assert result.score is None
 
 
 def test_aligned_span_is_offset_into_absolute_time() -> None:

@@ -55,7 +55,7 @@ class AlignmentScore:
     start: float  # subtitle event span, absolute seconds
     end: float
     text: str
-    score: float  # frame-weighted mean per-word CTC confidence, 0..1
+    score: float | None  # frame-weighted mean CTC confidence 0..1; None = unalignable
     aligned_start: float  # first aligned word, absolute seconds
     aligned_end: float  # last aligned word, absolute seconds
 
@@ -97,10 +97,11 @@ def score_event(
     window = audio[int(w0 * sample_rate) : int(w1 * sample_rate)]
     spans = aligner.align(window, event.text) if window.size else []
     if not spans:
-        # Nothing aligned (empty text, or a window too short to score). Report a
-        # zero score over the event's own span; the verdict layer decides
-        # whether that reads as a mismatch or simply UNCHECKABLE.
-        return AlignmentScore(event.start, event.end, event.text, 0.0, event.start, event.end)
+        # Could not align at all — empty text, or a window too short to fit the
+        # line's tokens under the CTC length rule. That is not a mismatch, so
+        # score is None and the verdict layer marks it UNCHECKABLE, never
+        # TEXT_MISMATCH.
+        return AlignmentScore(event.start, event.end, event.text, None, event.start, event.end)
     return AlignmentScore(
         start=event.start,
         end=event.end,
@@ -170,7 +171,16 @@ class MmsAligner:
         waveform = torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32)).unsqueeze(0)
         with torch.inference_mode():
             emission, _ = self._model(waveform)
-            token_spans = self._aligner(emission[0], self._tokenizer(words))
+            try:
+                token_spans = self._aligner(emission[0], self._tokenizer(words))
+            except RuntimeError as exc:
+                # CTC needs at least one audio frame per target token (plus
+                # adjacent repeats). A very short event carrying a full line of
+                # text — a Stage-1 flash or split duplicate — violates that. It
+                # is unverifiable here, not wrong, so return no spans.
+                if "targets length is too long" in str(exc):
+                    return []
+                raise
         seconds_per_frame = waveform.size(1) / emission.size(1) / SAMPLE_RATE
         out: list[WordSpan] = []
         for word, spans in zip(words, token_spans):
