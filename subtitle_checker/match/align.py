@@ -55,6 +55,7 @@ class AlignmentScore:
     start: float  # subtitle event span, absolute seconds
     end: float
     text: str
+    ocr_confidence: float  # Stage-1 OCR confidence for text; gates trust in a low score
     score: float | None  # frame-weighted mean CTC confidence 0..1; None = unalignable
     aligned_start: float  # first aligned word, absolute seconds
     aligned_end: float  # last aligned word, absolute seconds
@@ -101,11 +102,20 @@ def score_event(
         # line's tokens under the CTC length rule. That is not a mismatch, so
         # score is None and the verdict layer marks it UNCHECKABLE, never
         # TEXT_MISMATCH.
-        return AlignmentScore(event.start, event.end, event.text, None, event.start, event.end)
+        return AlignmentScore(
+            start=event.start,
+            end=event.end,
+            text=event.text,
+            ocr_confidence=event.confidence,
+            score=None,
+            aligned_start=event.start,
+            aligned_end=event.end,
+        )
     return AlignmentScore(
         start=event.start,
         end=event.end,
         text=event.text,
+        ocr_confidence=event.confidence,
         score=_mean_score(spans),
         aligned_start=w0 + spans[0].start,
         aligned_end=w0 + spans[-1].end,

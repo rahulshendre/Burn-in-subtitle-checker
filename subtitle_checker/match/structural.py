@@ -43,6 +43,18 @@ def _kind_overlap(event: SubtitleEvent, regions: list[AudioRegion], kind: AudioK
     return sum(_overlap(event.start, event.end, r.start, r.end) for r in regions if r.kind is kind)
 
 
+def event_has_speech(event: SubtitleEvent, regions: list[AudioRegion]) -> bool:
+    """True when speech covers enough of the event to make its words Stage 3's job.
+
+    The same test structural uses to skip an event (below) and alignment uses to
+    claim it — so the two stages partition the events with no overlap and no gap.
+    """
+    span = event.end - event.start
+    if span <= 0:
+        return False
+    return _kind_overlap(event, regions, AudioKind.SPEECH) / span >= SPEECH_COVER_MIN
+
+
 def _merge_missing(
     flags: list[CheckResult], events: list[SubtitleEvent]
 ) -> list[CheckResult]:
@@ -104,8 +116,7 @@ def check_structural(
         span = event.end - event.start
         if span <= 0:
             continue
-        speech = _kind_overlap(event, regions, AudioKind.SPEECH)
-        if speech / span >= SPEECH_COVER_MIN:
+        if event_has_speech(event, regions):
             continue  # has dialogue — Stage 3 checks the words
         music = _kind_overlap(event, regions, AudioKind.MUSIC)
         if music / span >= MUSIC_COVER_MIN:
