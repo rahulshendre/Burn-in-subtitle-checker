@@ -30,10 +30,13 @@ from subtitle_checker.match.structural import event_has_speech
 SAMPLE_RATE = 16_000
 # A little grace so the first/last word of a line is not clipped from the window.
 WINDOW_PAD_S = 0.3
-# token_set_ratio is 0-100; below this the heard and written words disagree
-# enough to flag. Precision-first placeholder — retune from real Sarvam
-# transcripts once the key is wired (see the alignment_eval pattern).
-MIN_TOKEN_RATIO = 60.0
+# token_set_ratio is 0-100. Live Sarvam on real audio: correct lines cluster
+# 82-100, gross divergence ~30, and single-word swaps sit at 75-93 — overlapping
+# correct, because OCR and ASR already disagree ~15% on spelling and word order.
+# So the cut flags only gross mismatches: it spares correct lines and misses
+# subtle single-word swaps (those are surfaced heard-vs-written in the report for
+# the editor, not auto-flagged — no full-line text metric separates them).
+MIN_TOKEN_RATIO = 65.0
 # Match alignment's trust gates: do not cross-check garbled OCR or tiny lines.
 MIN_OCR_CONF = 0.5
 MIN_WORDS = 3
