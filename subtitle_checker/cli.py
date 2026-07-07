@@ -36,6 +36,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     es.add_argument("--seed", type=int, default=0, help="RNG seed for defect planting")
 
+    ea = subparsers.add_parser(
+        "eval-alignment",
+        help="Swap words on a clip's real lines and measure alignment separation",
+    )
+    ea.add_argument("--video", required=True, help="A real clip with burned-in subtitles")
+    ea.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
+    ea.add_argument("--min-ocr-conf", type=float, default=0.5, help="Trust OCR text above this")
+    ea.add_argument("--seed", type=int, default=0, help="RNG seed for the word swap")
+
     return parser
 
 
@@ -49,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_eval_detection(args)
     if args.command == "eval-structural":
         return _run_eval_structural(args)
+    if args.command == "eval-alignment":
+        return _run_eval_alignment(args)
 
     parser.print_help()
     return 0
@@ -151,6 +162,36 @@ def _run_eval_structural(args: argparse.Namespace) -> int:
     print(f"precision: {score.precision:.2f}  ({score.false_flags} false flags)")
     for name, ts in sorted(score.by_type.items()):
         print(f"  {name:12} caught {ts.caught}/{ts.planted}, verdict ok {ts.verdict_correct}")
+    return 0
+
+
+# uroman wants ISO 639-3; the CLI speaks the 639-1 codes used elsewhere.
+_UROMAN_LANG = {"hi": "hin", "kn": "kan", "mr": "mar"}
+
+
+def _run_eval_alignment(args: argparse.Namespace) -> int:
+    video = Path(args.video)
+    if not video.exists():
+        print(f"video not found: {video}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.evaluation.alignment_eval import evaluate_alignment
+    from subtitle_checker.ingest.audio_track import extract_audio
+    from subtitle_checker.match.align import MmsAligner
+    from subtitle_checker.subtitles.ocr import EasyOcrEngine
+    from subtitle_checker.subtitles.reconstruct import reconstruct_subtitles
+
+    events = reconstruct_subtitles(video, engine=EasyOcrEngine([args.lang]))
+    audio = extract_audio(video)
+    aligner = MmsAligner(lang=_UROMAN_LANG.get(args.lang, "hin"))
+    result = evaluate_alignment(
+        events, audio, aligner, min_ocr_conf=args.min_ocr_conf, seed=args.seed
+    )
+
+    print(f"\n{result.pairs} trusted line(s) scored correct vs word-swapped")
+    print(f"correct mean: {result.correct_mean:.3f}   swapped mean: {result.swapped_mean:.3f}")
+    print(f"best threshold: {result.threshold:.3f}")
+    print(f"recall: {result.recall:.2f}   precision: {result.precision:.2f}")
     return 0
 
 
