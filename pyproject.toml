@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Flags mismatches between audio dialogue and burned-in subtitles in video files"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.26,<3"]
+dependencies = ["numpy>=1.26,<3", "rapidfuzz>=3.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
@@ -19,6 +19,9 @@ audio = ["silero-vad>=5.1"]
 # Forced alignment rides on torchaudio + uroman (romanizes Indic text for the
 # Latin MMS dictionary) — its own extra so OCR/VAD-only work skips the download
 align = ["torchaudio>=2.1", "uroman>=1.2"]
+# ASR cross-check calls the Sarvam HTTP API — only requests; the key comes from
+# the SARVAM_API_KEY environment variable, never a dependency or a file
+asr = ["requests>=2.31"]
 
 [project.scripts]
 subtitle-checker = "subtitle_checker.cli:main"
