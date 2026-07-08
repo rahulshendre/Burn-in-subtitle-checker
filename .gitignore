@@ -16,6 +16,11 @@ out/
 *.pth
 *.onnx
 
+# Secrets — API keys never committed
+.env
+.env.*
+!.env.example
+
 # Python
 __pycache__/
 *.pyc
