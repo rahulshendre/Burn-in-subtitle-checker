@@ -32,6 +32,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also run the Sarvam ASR cross-check for word-level errors (needs SARVAM_API_KEY)",
     )
 
+    rep = subparsers.add_parser(
+        "report", help="Render a saved check into a self-contained HTML report"
+    )
+    rep.add_argument(
+        "--results",
+        required=True,
+        help="A check_results.json file, or the out/<stem>/ directory holding it",
+    )
+    rep.add_argument("--video", required=True, help="Source video for frame + audio snippets")
+    rep.add_argument("--out", help="Output HTML path (default: beside the results)")
+
     ev = subparsers.add_parser(
         "eval-detection",
         help="Burn known lines onto a clean clip and measure what Stage 1 detects back",
@@ -64,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(args)
+    if args.command == "report":
+        return _run_report(args)
     if args.command == "eval-detection":
         return _run_eval_detection(args)
     if args.command == "eval-structural":
@@ -102,8 +115,47 @@ def _run_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_report(args: argparse.Namespace) -> int:
+    video = Path(args.video)
+    if not video.exists():
+        print(f"video not found: {video}", file=sys.stderr)
+        return 2
+
+    results_path = _resolve_results(Path(args.results), video)
+    if results_path is None:
+        print(f"no check_results found at: {args.results}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.report.evidence import write_report
+
+    kind, results = load_artifact(results_path)
+    if kind != "check_results":
+        print(f"not a check_results artifact: {results_path}", file=sys.stderr)
+        return 2
+
+    out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
+    write_report(video, results, out, title=f"Subtitle check — {video.stem}")
+    print(f"report -> {out}  ({len(results)} row(s))")
+    return 0
+
+
+def _resolve_results(path: Path, video: Path) -> Path | None:
+    """Accept a check_results.json file directly, or a directory holding one."""
+    if path.is_file():
+        return path
+    if path.is_dir():
+        named = path / f"{video.stem}_check_results.json"
+        if named.exists():
+            return named
+        found = sorted(path.glob("*_check_results.json"))
+        if found:
+            return found[0]
+    return None
+
+
 def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_asr: bool) -> None:
-    """Stage 2 + 3: label the audio, raise structural flags, check the words."""
+    """Stage 2 + 3: label the audio, raise flags, transcribe lines, write the report."""
     from subtitle_checker.artifacts import save_artifact
     from subtitle_checker.audio.regions import label_regions
     from subtitle_checker.ingest.audio_track import extract_audio
@@ -121,16 +173,16 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
     flags = check_structural(events, regions)
     flags += _alignment_flags(events, audio, regions, lang)
+    results = flags
     if run_asr:
-        seen = {(f.start, f.end) for f in flags}
-        flags += [f for f in _asr_flags(events, audio, regions, lang) if (f.start, f.end) not in seen]
-    flags.sort(key=lambda f: f.start)
-    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", flags)
+        flagged = {(f.start, f.end) for f in flags}
+        ledger = _asr_ledger(events, audio, regions, lang)
+        results = flags + [r for r in ledger if (r.start, r.end) not in flagged]
+    results.sort(key=lambda r: r.start)
+    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
-    print(f"\n{len(flags)} flag(s):")
-    for f in flags:
-        text = f.subtitle_text.strip() or "<no subtitle>"
-        print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
+    _print_flags(results)
+    _write_report(video, results, out_dir)
 
 
 def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
@@ -147,21 +199,41 @@ def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
     return check_alignment(scores, regions)
 
 
-def _asr_flags(events: list, audio, regions: list, lang: str) -> list:
-    """Stage 3 secondary: transcribe each line's audio and compare the words."""
+def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
+    """Stage 3 secondary: transcribe each trusted line for flags + report ledger."""
     import os
 
     if not os.environ.get("SARVAM_API_KEY"):
         print("ASR cross-check skipped — set SARVAM_API_KEY to enable it")
         return []
-    from subtitle_checker.match.asr import SarvamAsr, check_asr
+    from subtitle_checker.match.asr import SarvamAsr, transcribe_lines
 
     try:
         engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
-        return check_asr(events, audio, regions, engine)
+        return transcribe_lines(events, audio, regions, engine)
     except ImportError:
         print("ASR cross-check skipped — install the extra with: pip install '.[asr]'")
         return []
+
+
+def _print_flags(results: list) -> None:
+    from subtitle_checker.artifacts import Verdict
+
+    flags = [r for r in results if r.verdict is not Verdict.OK]
+    heard = len(results) - len(flags)
+    tail = f", {heard} line(s) transcribed:" if heard else ":"
+    print(f"\n{len(flags)} flag(s)" + tail)
+    for f in flags:
+        text = f.subtitle_text.strip() or "<no subtitle>"
+        print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
+
+
+def _write_report(video: Path, results: list, out_dir: Path) -> None:
+    from subtitle_checker.report.evidence import write_report
+
+    path = out_dir / f"{video.stem}_report.html"
+    write_report(video, results, path, title=f"Subtitle check — {video.stem}")
+    print(f"report -> {path}")
 
 
 def _run_eval_detection(args: argparse.Namespace) -> int:
