@@ -175,9 +175,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     flags += _alignment_flags(events, audio, regions, lang)
     results = flags
     if run_asr:
-        flagged = {(f.start, f.end) for f in flags}
-        ledger = _asr_ledger(events, audio, regions, lang)
-        results = flags + [r for r in ledger if (r.start, r.end) not in flagged]
+        results = _merge_results(flags, _asr_ledger(events, audio, regions, lang))
     results.sort(key=lambda r: r.start)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
@@ -214,6 +212,22 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
     except ImportError:
         print("ASR cross-check skipped — install the extra with: pip install '.[asr]'")
         return []
+
+
+def _merge_results(flags: list, ledger: list) -> list:
+    """Combine flags with the ASR ledger into the saved check_results.
+
+    An ASR row carries heard-vs-written evidence a bare alignment flag lacks, so
+    an ASR TEXT_MISMATCH supersedes an alignment flag on the same line. Otherwise
+    the remaining flags win their span, and the leftover ledger rows (the OK
+    heard-vs-written scan) fill in the lines nothing flagged.
+    """
+    from subtitle_checker.artifacts import Verdict
+
+    asr_mismatch = {(r.start, r.end) for r in ledger if r.verdict is Verdict.TEXT_MISMATCH}
+    flags = [f for f in flags if (f.start, f.end) not in asr_mismatch]
+    kept = {(f.start, f.end) for f in flags}
+    return flags + [r for r in ledger if (r.start, r.end) not in kept]
 
 
 def _print_flags(results: list) -> None:

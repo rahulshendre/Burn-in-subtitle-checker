@@ -8,7 +8,7 @@ import pytest
 
 from subtitle_checker import __version__
 from subtitle_checker.artifacts import CheckResult, Verdict, save_artifact
-from subtitle_checker.cli import main
+from subtitle_checker.cli import _merge_results, main
 
 _needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg required")
 
@@ -40,6 +40,30 @@ def test_no_command_prints_help_and_succeeds(capsys: pytest.CaptureFixture) -> N
 def test_check_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:
     assert main(["check", "--video", "no_such_clip.mp4"]) == 2
     assert "not found" in capsys.readouterr().err
+
+
+def test_merge_prefers_asr_evidence_over_bare_alignment_flag() -> None:
+    align = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "alignment", subtitle_text="X")
+    asr = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "asr", "X", heard_text="Y", score=0.3)
+    merged = _merge_results([align], [asr])
+    assert len(merged) == 1
+    assert merged[0].heard_text == "Y"  # ASR row (with heard text) wins the span
+
+
+def test_merge_keeps_structural_flag_and_adds_ok_ledger() -> None:
+    miss = CheckResult(5.0, 7.0, Verdict.MISSING_SUBTITLE, "missing")
+    ok = CheckResult(1.0, 3.0, Verdict.OK, "ok", "A", "A")
+    merged = _merge_results([miss], [ok])
+    spans = {(r.start, r.end) for r in merged}
+    assert spans == {(5.0, 7.0), (1.0, 3.0)}
+
+
+def test_merge_alignment_flag_survives_when_asr_says_ok() -> None:
+    align = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "alignment", subtitle_text="X")
+    ok = CheckResult(1.0, 3.0, Verdict.OK, "ok", "X", "X")
+    merged = _merge_results([align], [ok])
+    assert len(merged) == 1
+    assert merged[0].verdict is Verdict.TEXT_MISMATCH  # flag wins, OK row deduped out
 
 
 def test_report_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:
