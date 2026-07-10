@@ -168,6 +168,44 @@ def transcribe_lines(
     return results
 
 
+def skipped_lines(
+    events: list[SubtitleEvent],
+    results: list[CheckResult],
+    regions: list[AudioRegion] | None = None,
+    *,
+    min_ocr_conf: float = MIN_OCR_CONF,
+    min_words: int = MIN_WORDS,
+) -> list[tuple[SubtitleEvent, str]]:
+    """Detected lines that got no verdict row, each with why they were declined.
+
+    Mirrors _heard_line's trust gate so the report can show an editor that a
+    line was noticed and passed over deliberately, not missed. Without
+    ``regions`` the speech test is skipped (the artifact may be absent).
+    """
+
+    def claimed(e: SubtitleEvent) -> bool:
+        return any(
+            abs(r.start - e.start) < 0.05 and abs(r.end - e.end) < 0.05 for r in results
+        )
+
+    skipped: list[tuple[SubtitleEvent, str]] = []
+    for event in events:
+        if claimed(event):
+            continue
+        if regions is not None and not event_has_speech(event, regions):
+            reason = "no speech under this line"
+        elif event.confidence < min_ocr_conf:
+            reason = (
+                f"OCR read too unreliable to compare (confidence {event.confidence:.2f})"
+            )
+        elif len(event.text.split()) < min_words:
+            reason = "too short to compare word-for-word"
+        else:
+            reason = "nothing was transcribed for this line"
+        skipped.append((event, reason))
+    return skipped
+
+
 def check_asr(
     events: list[SubtitleEvent],
     audio: np.ndarray,

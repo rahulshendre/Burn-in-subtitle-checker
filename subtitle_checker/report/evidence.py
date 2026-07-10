@@ -13,7 +13,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from subtitle_checker.artifacts import CheckResult
+from subtitle_checker.artifacts import CheckResult, SubtitleEvent
 from subtitle_checker.report.html import render_report
 
 FRAME_WIDTH = 320
@@ -70,11 +70,13 @@ def write_report(
     *,
     title: str | None = None,
     generated: str | None = None,
+    skipped: list[tuple[SubtitleEvent, str]] | None = None,
 ) -> Path:
     """Render ``results`` against ``video`` and write a self-contained HTML file."""
     evidence = FfmpegEvidence(video)
     document = render_report(
-        results, evidence, title=title or video.stem, generated=generated
+        results, evidence, title=title or video.stem, generated=generated,
+        skipped=skipped,
     )
     out_path.write_text(document, encoding="utf-8")
     return out_path

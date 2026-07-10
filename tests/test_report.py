@@ -6,7 +6,7 @@ is opaque bytes here; the ffmpeg-backed extractor is tested separately.
 
 from __future__ import annotations
 
-from subtitle_checker.artifacts import CheckResult, Verdict
+from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
 from subtitle_checker.report.html import render_report
 
 
@@ -105,3 +105,21 @@ def test_null_evidence_degrades():
     out = render_report(_sample(), NullEvidence(), title="Demo")
     assert "no frame" in out  # frame placeholder
     assert "<audio" not in out  # audio omitted, not a broken tag
+
+
+def test_skipped_lines_render_with_reason():
+    skipped = [
+        (
+            SubtitleEvent(12.0, 14.0, "और बुरा तो तब होगा", 0.32),
+            "OCR read too unreliable to compare (confidence 0.32)",
+        )
+    ]
+    out = render_report(_sample(), FakeEvidence(), title="Demo", skipped=skipped)
+    assert "Skipped lines (1)" in out
+    assert "और बुरा तो तब होगा" in out
+    assert "confidence 0.32" in out
+
+
+def test_no_skipped_section_when_none_given():
+    out = render_report(_sample(), FakeEvidence(), title="Demo")
+    assert "Skipped lines" not in out

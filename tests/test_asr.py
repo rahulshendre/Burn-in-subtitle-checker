@@ -6,8 +6,14 @@ import wave
 
 import numpy as np
 
-from subtitle_checker.artifacts import AudioKind, AudioRegion, SubtitleEvent, Verdict
-from subtitle_checker.match.asr import _to_wav, check_asr, transcribe_lines
+from subtitle_checker.artifacts import (
+    AudioKind,
+    AudioRegion,
+    CheckResult,
+    SubtitleEvent,
+    Verdict,
+)
+from subtitle_checker.match.asr import _to_wav, check_asr, skipped_lines, transcribe_lines
 
 SPEECH = [AudioRegion(0.0, 6.0, AudioKind.SPEECH)]
 MUSIC = [AudioRegion(0.0, 6.0, AudioKind.MUSIC)]
@@ -83,6 +89,35 @@ def test_check_asr_keeps_only_mismatches() -> None:
     flags = check_asr(events, AUDIO, SPEECH, engine)
     assert len(flags) == 1
     assert flags[0].verdict is Verdict.TEXT_MISMATCH
+
+
+def test_skipped_lines_reason_per_gate() -> None:
+    regions = [
+        AudioRegion(0.0, 10.0, AudioKind.SPEECH),
+        AudioRegion(10.0, 20.0, AudioKind.MUSIC),
+    ]
+    events = [
+        SubtitleEvent(1.0, 3.0, "पहली सही लाइन है", 0.9),  # claimed by a result row
+        SubtitleEvent(4.0, 6.0, "गड़बड़ पाठ यहाँ है", 0.2),  # untrusted OCR
+        SubtitleEvent(7.0, 9.0, "दो शब्द", 0.9),  # too short
+        SubtitleEvent(12.0, 14.0, "गाने के ऊपर वाली लाइन", 0.9),  # over music
+        SubtitleEvent(6.2, 6.9, "सुनाई नहीं दिया कुछ", 0.9),  # trusted, never heard
+    ]
+    results = [
+        CheckResult(1.0, 3.0, Verdict.OK, "ok", "पहली सही लाइन है", "पहली सही लाइन है")
+    ]
+    reasons = {e.text: reason for e, reason in skipped_lines(events, results, regions)}
+    assert "पहली सही लाइन है" not in reasons
+    assert "confidence 0.20" in reasons["गड़बड़ पाठ यहाँ है"]
+    assert reasons["दो शब्द"] == "too short to compare word-for-word"
+    assert reasons["गाने के ऊपर वाली लाइन"] == "no speech under this line"
+    assert reasons["सुनाई नहीं दिया कुछ"] == "nothing was transcribed for this line"
+
+
+def test_skipped_lines_without_regions_skips_speech_test() -> None:
+    events = [SubtitleEvent(1.0, 2.0, "बिना क्षेत्र सूचना के", 0.1)]
+    (_, reason), = skipped_lines(events, [], None)
+    assert "confidence 0.10" in reason
 
 
 def test_to_wav_is_valid_pcm() -> None:

@@ -22,7 +22,7 @@ import html
 from datetime import datetime
 from typing import Protocol
 
-from subtitle_checker.artifacts import CheckResult, Verdict
+from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
 
 
 class Evidence(Protocol):
@@ -73,12 +73,15 @@ def render_report(
     *,
     title: str,
     generated: str | None = None,
+    skipped: list[tuple[SubtitleEvent, str]] | None = None,
 ) -> str:
     """Render check results into one self-contained HTML document.
 
     ``results`` may be flags only (as ``check`` saves them) or the full per-line
     ledger (OK rows carrying heard-vs-written). Flags become evidence cards
-    worst-first; OK rows, if present, become a scan table below.
+    worst-first; OK rows, if present, become a scan table below. ``skipped``
+    lists detected lines the checker declined to verify, with reasons, so the
+    editor sees they were passed over deliberately rather than missed.
     """
     flags = [r for r in results if r.verdict is not Verdict.OK]
     oks = [r for r in results if r.verdict is Verdict.OK]
@@ -91,6 +94,7 @@ def render_report(
         _summary(title, results, stamp),
         _flags_section(flags, evidence),
         _ledger_section(oks, evidence),
+        _skipped_section(sorted(skipped or [], key=lambda s: s[0].start), evidence),
         _foot(),
     ]
     return "\n".join(parts)
@@ -187,6 +191,32 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     )
 
 
+def _skipped_section(
+    skipped: list[tuple[SubtitleEvent, str]], evidence: Evidence
+) -> str:
+    if not skipped:
+        return ""
+    rows = "\n".join(_skipped_row(e, reason, evidence) for e, reason in skipped)
+    return (
+        f'<section class="skipped"><h2>Skipped lines ({len(skipped)})</h2>'
+        '<p class="note">These subtitles were detected but not verified '
+        "word-for-word — checking them against the audio would risk a false "
+        "alarm. Each row says why.</p>"
+        '<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle (OCR read)</th>'
+        "<th>Why skipped</th></tr></thead><tbody>"
+        f"{rows}</tbody></table></section>"
+    )
+
+
+def _skipped_row(e: SubtitleEvent, reason: str, evidence: Evidence) -> str:
+    thumb = _thumb_html(evidence.frame_png((e.start + e.end) / 2.0))
+    text = html.escape(e.text.strip()) or '<em class="none">— unreadable —</em>'
+    return (
+        f'<tr><td class="tspan">{_ts(e.start)}</td><td class="thumb">{thumb}</td>'
+        f'<td class="deva">{text}</td><td class="why">{html.escape(reason)}</td></tr>'
+    )
+
+
 def _frame_html(png: bytes | None) -> str:
     if not png:
         return '<div class="noframe">no frame</div>'
@@ -266,6 +296,7 @@ _STYLE = """<style>
            vertical-align:top; }
   th { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:#888; }
   td.thumb { width:160px; }
+  td.why { color:#777; font-size:.88rem; }
   .thumb-img { width:150px; border-radius:3px; display:block; }
   td audio { width:190px; height:30px; margin:0; }
 </style>"""

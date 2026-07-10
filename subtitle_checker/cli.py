@@ -135,9 +135,24 @@ def _run_report(args: argparse.Namespace) -> int:
         return 2
 
     out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
-    write_report(video, results, out, title=f"Subtitle check — {video.stem}")
+    skipped = _load_skipped(results_path, video, results)
+    write_report(video, results, out, title=f"Subtitle check — {video.stem}", skipped=skipped)
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
+
+
+def _load_skipped(results_path: Path, video: Path, results: list) -> list | None:
+    """Rebuild the skipped-lines list from sibling artifacts when they exist."""
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.match.asr import skipped_lines
+
+    events_path = results_path.parent / f"{video.stem}_subtitle_events.json"
+    if not events_path.exists():
+        return None
+    _, events = load_artifact(events_path)
+    regions_path = results_path.parent / f"{video.stem}_audio_regions.json"
+    regions = load_artifact(regions_path)[1] if regions_path.exists() else None
+    return skipped_lines(events, results, regions)
 
 
 def _resolve_results(path: Path, video: Path) -> Path | None:
@@ -179,8 +194,10 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     results.sort(key=lambda r: r.start)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
+    from subtitle_checker.match.asr import skipped_lines
+
     _print_flags(results)
-    _write_report(video, results, out_dir)
+    _write_report(video, results, out_dir, skipped_lines(events, results, regions))
 
 
 def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
@@ -242,11 +259,11 @@ def _print_flags(results: list) -> None:
         print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
 
 
-def _write_report(video: Path, results: list, out_dir: Path) -> None:
+def _write_report(video: Path, results: list, out_dir: Path, skipped: list | None = None) -> None:
     from subtitle_checker.report.evidence import write_report
 
     path = out_dir / f"{video.stem}_report.html"
-    write_report(video, results, path, title=f"Subtitle check — {video.stem}")
+    write_report(video, results, path, title=f"Subtitle check — {video.stem}", skipped=skipped)
     print(f"report -> {path}")
 
 
