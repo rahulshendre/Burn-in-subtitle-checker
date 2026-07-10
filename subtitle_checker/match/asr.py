@@ -92,6 +92,82 @@ def _to_wav(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> io.BytesIO:
     return buf
 
 
+def _heard_line(
+    event: SubtitleEvent,
+    audio: np.ndarray,
+    regions: list[AudioRegion],
+    engine: AsrEngine,
+    min_ocr_conf: float,
+    min_words: int,
+    sample_rate: int,
+    pad: float,
+) -> tuple[str, float] | None:
+    """Transcribe one trusted, speech-covered line -> (heard, token_set_ratio).
+
+    Returns None when the line is not worth comparing: no speech beneath it,
+    untrusted or too-short OCR, an empty window, or the ASR heard nothing. The
+    shared trust gate behind both the flags and the report ledger.
+    """
+    if not event_has_speech(event, regions):
+        return None  # no speech to transcribe — structural's call
+    if event.confidence < min_ocr_conf or len(event.text.split()) < min_words:
+        return None  # untrusted or too short to compare word-for-word
+    w0 = max(0.0, event.start - pad)
+    w1 = min(len(audio) / sample_rate, event.end + pad)
+    window = audio[int(w0 * sample_rate) : int(w1 * sample_rate)]
+    if not window.size:
+        return None
+    heard = engine.transcribe(window)
+    if not heard:
+        return None  # ASR heard nothing — abstain rather than accuse
+    return heard, token_set_ratio(event.text, heard)
+
+
+def transcribe_lines(
+    events: list[SubtitleEvent],
+    audio: np.ndarray,
+    regions: list[AudioRegion],
+    engine: AsrEngine,
+    min_ratio: float = MIN_TOKEN_RATIO,
+    min_ocr_conf: float = MIN_OCR_CONF,
+    min_words: int = MIN_WORDS,
+    sample_rate: int = SAMPLE_RATE,
+    pad: float = WINDOW_PAD_S,
+) -> list[CheckResult]:
+    """Transcribe every comparable line for the report's heard-vs-written ledger.
+
+    One CheckResult per trusted, speech-covered line — OK when the heard words
+    match the subtitle, TEXT_MISMATCH when they diverge grossly — each carrying
+    heard_text. The OK rows are what let an editor eyeball the subtle single-word
+    errors that sit below the auto-flag noise floor (see the module docstring).
+    """
+    results: list[CheckResult] = []
+    for event in events:
+        heard_ratio = _heard_line(
+            event, audio, regions, engine, min_ocr_conf, min_words, sample_rate, pad
+        )
+        if heard_ratio is None:
+            continue
+        heard, ratio = heard_ratio
+        mismatch = ratio < min_ratio
+        results.append(
+            CheckResult(
+                start=event.start,
+                end=event.end,
+                verdict=Verdict.TEXT_MISMATCH if mismatch else Verdict.OK,
+                reason=(
+                    f"heard words differ from the subtitle (match {ratio:.0f}%)"
+                    if mismatch
+                    else f"heard words match the subtitle (match {ratio:.0f}%)"
+                ),
+                subtitle_text=event.text,
+                heard_text=heard,
+                score=ratio / 100.0,
+            )
+        )
+    return results
+
+
 def check_asr(
     events: list[SubtitleEvent],
     audio: np.ndarray,
@@ -103,32 +179,16 @@ def check_asr(
     sample_rate: int = SAMPLE_RATE,
     pad: float = WINDOW_PAD_S,
 ) -> list[CheckResult]:
-    """Flag speech-covered lines whose heard words differ from the subtitle."""
-    results: list[CheckResult] = []
-    for event in events:
-        if not event_has_speech(event, regions):
-            continue  # no speech to transcribe — structural's call
-        if event.confidence < min_ocr_conf or len(event.text.split()) < min_words:
-            continue  # untrusted or too short to compare word-for-word
-        w0 = max(0.0, event.start - pad)
-        w1 = min(len(audio) / sample_rate, event.end + pad)
-        window = audio[int(w0 * sample_rate) : int(w1 * sample_rate)]
-        if not window.size:
-            continue
-        heard = engine.transcribe(window)
-        if not heard:
-            continue  # ASR heard nothing — abstain rather than accuse
-        ratio = token_set_ratio(event.text, heard)
-        if ratio < min_ratio:
-            results.append(
-                CheckResult(
-                    start=event.start,
-                    end=event.end,
-                    verdict=Verdict.TEXT_MISMATCH,
-                    reason=f"heard words differ from the subtitle (match {ratio:.0f}%)",
-                    subtitle_text=event.text,
-                    heard_text=heard,
-                    score=ratio / 100.0,
-                )
-            )
-    return results
+    """Flag speech-covered lines whose heard words differ from the subtitle.
+
+    The flag subset of transcribe_lines: only the gross TEXT_MISMATCH rows, for
+    the eval harness and the pipeline's flag list.
+    """
+    return [
+        r
+        for r in transcribe_lines(
+            events, audio, regions, engine,
+            min_ratio, min_ocr_conf, min_words, sample_rate, pad,
+        )
+        if r.verdict is Verdict.TEXT_MISMATCH
+    ]
