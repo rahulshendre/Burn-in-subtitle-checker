@@ -167,20 +167,21 @@ def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
         '<section class="ledger"><h2>Matching lines — heard vs written</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
-        '<table><thead><tr><th>Time</th><th>Written</th><th>Heard (ASR)</th>'
-        "<th>Audio</th></tr></thead><tbody>"
+        '<table><thead><tr><th>Time</th><th>Frame</th><th>Written</th>'
+        "<th>Heard (ASR)</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
 
 
 def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
+    thumb = _thumb_html(evidence.frame_png((r.start + r.end) / 2.0))
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
     written = html.escape(r.subtitle_text.strip()) or "—"
     heard = html.escape(r.heard_text.strip()) or '<em class="none">—</em>'
     return (
-        f'<tr><td class="tspan">{_ts(r.start)}</td>'
+        f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
         f"<td>{audio}</td></tr>"
     )
@@ -191,6 +192,13 @@ def _frame_html(png: bytes | None) -> str:
         return '<div class="noframe">no frame</div>'
     uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
     return f'<img alt="subtitle frame" src="{uri}">'
+
+
+def _thumb_html(png: bytes | None) -> str:
+    if not png:
+        return '<span class="none">—</span>'
+    uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    return f'<img class="thumb-img" alt="subtitle frame" src="{uri}">'
 
 
 def _audio_html(clip: tuple[bytes, str] | None) -> str:
@@ -257,5 +265,7 @@ _STYLE = """<style>
   th, td { text-align:left; padding:.45rem .5rem; border-bottom:1px solid var(--line);
            vertical-align:top; }
   th { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:#888; }
-  td audio { width:200px; height:30px; margin:0; }
+  td.thumb { width:160px; }
+  .thumb-img { width:150px; border-radius:3px; display:block; }
+  td audio { width:190px; height:30px; margin:0; }
 </style>"""
