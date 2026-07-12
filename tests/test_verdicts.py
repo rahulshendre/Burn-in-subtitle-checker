@@ -49,3 +49,28 @@ def test_threshold_is_precision_first() -> None:
     # just above the cut clears; just below trips it (on a long-enough line)
     assert check_alignment([_score(0.31)], SPEECH) == []
     assert check_alignment([_score(0.29)], SPEECH)[0].verdict is Verdict.TEXT_MISMATCH
+
+
+def test_low_ocr_confidence_high_alignment_is_verified() -> None:
+    # unreliable OCR conf, but the words align strongly → verify, don't abstain
+    results = check_alignment([_score(0.6, ocr_confidence=0.2)], SPEECH)
+    assert len(results) == 1
+    assert results[0].verdict is Verdict.OK
+
+
+def test_low_ocr_confidence_moderate_alignment_still_abstains() -> None:
+    # below the verify floor: not proof enough to confirm, so still no verdict
+    assert check_alignment([_score(0.5, ocr_confidence=0.2)], SPEECH) == []
+
+
+def test_rescue_does_not_require_min_span() -> None:
+    # a short line the mismatch test would skip is still verifiable on a high score
+    results = check_alignment(
+        [_score(0.6, ocr_confidence=0.2, start=1.0, end=1.4)], SPEECH
+    )
+    assert results[0].verdict is Verdict.OK
+
+
+def test_trusted_line_is_not_double_verified() -> None:
+    # a good score with trustworthy OCR stays silent — the ASR ledger owns its OK
+    assert check_alignment([_score(0.6, ocr_confidence=0.9)], SPEECH) == []
