@@ -2,9 +2,12 @@
 
 Two passes over the sampled band:
 
-1. Presence pass — how often each pixel is lit across the video. Pixels lit
-   most of the time are chrome (channel bugs, watermarks, "TATA PLAY"), not
-   subtitles, and get removed from every mask before detection.
+1. Presence pass — how often each pixel, and each pixel's neighborhood, is lit
+   across the video. Pixels lit most of the time are chrome (channel bugs,
+   watermarks); a whole little region lit most of the time even when no single
+   pixel stays on is an animated logo whose shine sweeps ("TATA PLAY",
+   "MELBON"). Both are chrome, not subtitles, and get removed from every mask
+   before detection.
 2. Event pass — a run of consecutive frames whose masks stay similar is one
    subtitle event; the text changing (IoU drop) or vanishing closes it.
 """
@@ -15,6 +18,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.ndimage import maximum_filter
 
 from subtitle_checker.subtitles.masks import mask_iou
 
@@ -25,6 +29,14 @@ SAME_EVENT_IOU = 0.35
 MIN_TEXT_PIXELS = 120
 # A pixel lit for over this fraction of the whole video is chrome.
 CHROME_PRESENCE = 0.5
+# An animated logo (a channel bug whose shine sweeps) never keeps one pixel lit,
+# so per-pixel presence slips past it. But *something* in its little box is
+# bright every frame: a pixel whose neighborhood is occupied for this fraction
+# of the video is chrome too. The footprint is (rows, cols) at detection scale —
+# wide enough to bridge the sweep, short enough not to reach from a corner logo
+# up into a subtitle line.
+CHROME_REGION_PRESENCE = 0.8
+CHROME_REGION_FOOT = (5, 15)
 # Shorter than this is a sampling blip, not a subtitle line.
 MIN_EVENT_S = 0.4
 # Longer than this is a disclaimer or other persistent text, not dialogue.
@@ -110,9 +122,51 @@ def presence_fraction(masks: Iterable[np.ndarray]) -> np.ndarray:
     return total / count
 
 
-def chrome_mask(presence: np.ndarray, cutoff: float = CHROME_PRESENCE) -> np.ndarray:
-    """Pixels lit persistently enough to be chrome rather than subtitles."""
-    return presence >= cutoff
+def presence_fields(
+    masks: Iterable[np.ndarray], region_foot: tuple[int, int] = CHROME_REGION_FOOT
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-pixel and region presence over the mask stream, in one pass.
+
+    Region presence max-pools each frame's mask before accumulating, so it
+    measures how often *something* is lit in a pixel's neighborhood — a
+    sweeping logo shine registers here every frame even when no single pixel
+    stays lit. Returned next to the plain per-pixel presence so chrome_mask can
+    use both.
+    """
+    pixel: np.ndarray | None = None
+    region: np.ndarray | None = None
+    count = 0
+    for mask in masks:
+        pooled = maximum_filter(mask, size=region_foot)
+        if pixel is None:
+            pixel = mask.astype(np.uint32)
+            region = pooled.astype(np.uint32)
+        else:
+            pixel += mask
+            region += pooled
+        count += 1
+    if pixel is None:
+        raise ValueError("no frames sampled from video")
+    return pixel / count, region / count
+
+
+def chrome_mask(
+    presence: np.ndarray,
+    region_presence: np.ndarray | None = None,
+    cutoff: float = CHROME_PRESENCE,
+    region_cutoff: float = CHROME_REGION_PRESENCE,
+) -> np.ndarray:
+    """Pixels persistent enough to be chrome rather than subtitles.
+
+    A pixel is chrome if it is lit for ``cutoff`` of the video, or — when
+    ``region_presence`` is supplied — if its neighborhood is occupied for
+    ``region_cutoff`` of it, which catches animated logos the per-pixel test
+    slips past.
+    """
+    chrome = presence >= cutoff
+    if region_presence is not None:
+        chrome = chrome | (region_presence >= region_cutoff)
+    return chrome
 
 
 def detect_events(

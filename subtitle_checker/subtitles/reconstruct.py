@@ -1,6 +1,7 @@
 """Stage 1 orchestration: video → subtitle event timeline.
 
-Pass A samples the band and accumulates per-pixel presence to find chrome.
+Pass A samples the band and accumulates per-pixel and region presence to find
+chrome (static bugs and animated logos alike).
 Pass B re-samples and detects events on chrome-subtracted masks.
 Each surviving event is OCR'd once, at its middle frame, at native
 resolution.
@@ -16,7 +17,7 @@ from subtitle_checker.subtitles.events import (
     RawEvent,
     chrome_mask,
     detect_events,
-    presence_fraction,
+    presence_fields,
 )
 from subtitle_checker.subtitles.masks import text_mask
 from subtitle_checker.subtitles.ocr import EasyOcrEngine, OcrEngine
@@ -38,10 +39,10 @@ def detect_raw_events(
     """Detect on-screen text spans without OCR (both sampling passes)."""
     kwargs = {} if threshold is None else {"threshold": threshold}
 
-    presence = presence_fraction(
+    presence, region = presence_fields(
         text_mask(frame, **kwargs) for _, frame in iter_band_frames(video, fps, band_top)
     )
-    chrome = chrome_mask(presence)
+    chrome = chrome_mask(presence, region)
 
     events = detect_events(
         ((t, text_mask(frame, **kwargs)) for t, frame in iter_band_frames(video, fps, band_top)),

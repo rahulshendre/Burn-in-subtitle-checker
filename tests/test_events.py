@@ -4,8 +4,11 @@ import numpy as np
 import pytest
 
 from subtitle_checker.subtitles.events import (
+    CHROME_PRESENCE,
+    CHROME_REGION_PRESENCE,
     chrome_mask,
     detect_events,
+    presence_fields,
     presence_fraction,
 )
 
@@ -120,6 +123,37 @@ def test_chrome_pixels_are_ignored() -> None:
     events = detect_events(stream(masks), chrome=chrome)
     assert len(events) == 1
     assert events[0].start == pytest.approx(2.25)
+
+
+def test_region_presence_catches_animated_logo() -> None:
+    # A logo whose bright column sweeps inside cols 80-95: no single pixel
+    # stays lit, but its little box is occupied every frame. A centered
+    # subtitle sits stably in the band during part of the clip.
+    masks = []
+    for i in range(16):
+        mask = blank()
+        mask[8:16, 80 + (i % 16)] = True  # sweeping logo shine
+        if i % 5 < 2:
+            mask[8:16, 20:55] = True  # subtitle, present part of the time
+        masks.append(mask)
+
+    presence, region = presence_fields(m for m in masks)
+    # per-pixel presence misses the sweep (any one logo column lit 1/16)
+    assert presence[12, 88] < CHROME_PRESENCE
+    # region presence catches it: the neighborhood is lit nearly every frame
+    assert region[12, 88] >= CHROME_REGION_PRESENCE
+
+    chrome = chrome_mask(presence, region)
+    assert chrome[12, 88]  # animated logo removed
+    assert not chrome[12, 35]  # centered subtitle kept
+
+    # without the region signal the old per-pixel test lets the logo through
+    assert not chrome_mask(presence)[12, 88]
+
+
+def test_presence_fields_requires_frames() -> None:
+    with pytest.raises(ValueError, match="no frames"):
+        presence_fields(iter([]))
 
 
 def test_presence_fraction_requires_frames() -> None:
