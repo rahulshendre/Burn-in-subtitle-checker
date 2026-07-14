@@ -36,4 +36,5 @@ pytest
 
 Hindi first; other languages follow once Hindi works end to end.
 
-Status: active development. Each stage lands as its own reviewable branch.
+Status: under active development. Pipeline stages are landing as separate,
+reviewable PRs.
