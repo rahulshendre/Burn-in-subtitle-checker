@@ -66,6 +66,18 @@ def build_parser() -> argparse.ArgumentParser:
     ea.add_argument("--min-ocr-conf", type=float, default=0.5, help="Trust OCR text above this")
     ea.add_argument("--seed", type=int, default=0, help="RNG seed for the word swap")
 
+    ui = subparsers.add_parser(
+        "ui", help="Serve the pre-built reports in a minimal local web UI"
+    )
+    ui.add_argument(
+        "paths",
+        nargs="*",
+        default=["out"],
+        help="Report files or directories to list (default: out)",
+    )
+    ui.add_argument("--port", type=int, default=8000, help="Local port to serve on")
+    ui.add_argument("--no-open", action="store_true", help="Do not open a browser window")
+
     return parser
 
 
@@ -83,8 +95,21 @@ def main(argv: list[str] | None = None) -> int:
         return _run_eval_structural(args)
     if args.command == "eval-alignment":
         return _run_eval_alignment(args)
+    if args.command == "ui":
+        return _run_ui(args)
 
     parser.print_help()
+    return 0
+
+
+def _run_ui(args: argparse.Namespace) -> int:
+    from subtitle_checker.report.webui import discover_reports, serve
+
+    entries = discover_reports([Path(p) for p in args.paths])
+    if not entries:
+        print(f"no reports found in: {', '.join(args.paths)}", file=sys.stderr)
+        print("generate one first with: subtitle-checker check --video <clip>", file=sys.stderr)
+    serve(entries, port=args.port, open_browser=not args.no_open)
     return 0
 
 
