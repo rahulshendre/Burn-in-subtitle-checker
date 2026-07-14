@@ -77,6 +77,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ui.add_argument("--port", type=int, default=8000, help="Local port to serve on")
     ui.add_argument("--no-open", action="store_true", help="Do not open a browser window")
+    ui.add_argument(
+        "--label",
+        action="append",
+        help="Friendly label for each path, in order (repeatable)",
+    )
 
     return parser
 
@@ -103,9 +108,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_ui(args: argparse.Namespace) -> int:
-    from subtitle_checker.report.webui import discover_reports, serve
+    from subtitle_checker.report.webui import discover_reports, relabel, serve
 
-    entries = discover_reports([Path(p) for p in args.paths])
+    entries = relabel(discover_reports([Path(p) for p in args.paths]), args.label or [])
     if not entries:
         print(f"no reports found in: {', '.join(args.paths)}", file=sys.stderr)
         print("generate one first with: subtitle-checker check --video <clip>", file=sys.stderr)

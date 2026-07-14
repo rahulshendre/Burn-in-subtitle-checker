@@ -5,6 +5,7 @@ from __future__ import annotations
 from subtitle_checker.report.webui import (
     ReportEntry,
     discover_reports,
+    relabel,
     render_index,
 )
 
@@ -57,3 +58,16 @@ def test_render_index_empty_state():
 
     assert "No reports found" in page
     assert "<iframe" not in page
+
+
+def test_relabel_overrides_in_order_and_keeps_the_rest():
+    entries = [
+        ReportEntry(id="0", label="raw one", path=None),
+        ReportEntry(id="1", label="raw two", path=None),
+    ]
+
+    out = relabel(entries, ["Mann - clean (0 flags)"])
+
+    assert out[0].label == "Mann - clean (0 flags)"
+    assert out[1].label == "raw two"
+    assert out[0].id == "0" and out[0].path is None

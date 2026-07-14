@@ -17,7 +17,7 @@ import html
 import re
 import threading
 import webbrowser
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
@@ -62,6 +62,16 @@ def discover_reports(roots: list[Path]) -> list[ReportEntry]:
     return [
         ReportEntry(id=str(i), label=_clean_label(p.stem), path=p)
         for i, p in enumerate(paths)
+    ]
+
+
+def relabel(entries: list[ReportEntry], labels: list[str]) -> list[ReportEntry]:
+    """Override entry labels positionally; unmatched entries keep their filename label."""
+    return [
+        replace(e, label=labels[i].strip())
+        if i < len(labels) and labels[i].strip()
+        else e
+        for i, e in enumerate(entries)
     ]
 
 
