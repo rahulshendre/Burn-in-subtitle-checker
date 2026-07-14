@@ -1,7 +1,7 @@
-# Stage 1 — Subtitle Event Detection
+# Stage 1 - Subtitle Event Detection
 
 **What it does:** takes a video with burned-in subtitles and produces the
-subtitle track — a list of events, each with a start time, end time, the
+subtitle track - a list of events, each with a start time, end time, the
 text on screen, and an OCR confidence:
 
 ```
@@ -10,8 +10,8 @@ text on screen, and an OCR confidence:
 
 Everything later in the pipeline (audio matching, mismatch flagging, the
 report) builds on this track, so Stage 1 has one job: find **exactly** the
-subtitles — not the channel logo, not the news ticker, not sparkling
-jewellery — and read each one **once**.
+subtitles - not the channel logo, not the news ticker, not sparkling
+jewellery - and read each one **once**.
 
 No machine learning is involved. The whole stage is pixel counting with
 five measured constants, and it runs at roughly 24× realtime on a laptop
@@ -32,7 +32,7 @@ The bottom of a real TV frame is crowded:
 
 All three are bright text-like pixels. A naive "find bright text at the
 bottom" approach reads all of them into one garbled string. Stage 1
-separates them **by how they behave over time**, never by where they sit —
+separates them **by how they behave over time**, never by where they sit -
 so it works regardless of channel layout.
 
 ## The core idea: three clocks
@@ -48,11 +48,11 @@ Each kind of on-screen text lives on a different timescale:
 
 So we measure pixel behaviour at three timescales:
 
-1. **Whole video** — a pixel lit in ≥50% of all frames is *chrome*
+1. **Whole video** - a pixel lit in ≥50% of all frames is *chrome*
    (logo, watermark, static disclaimer chip). Erased everywhere.
-2. **Frame to frame** — each mask is ANDed with the previous frame's mask.
+2. **Frame to frame** - each mask is ANDed with the previous frame's mask.
    Subtitles survive (they persist); sparkle dies (it moves every frame).
-3. **Within one event** — a pixel lit in <60% of the event's frames is
+3. **Within one event** - a pixel lit in <60% of the event's frames is
    transient (a ticker sweeping past). Only stable pixels define the text
    region we crop for OCR.
 
@@ -77,12 +77,12 @@ flowchart TD
 
 Two passes over the video are needed because chrome can only be judged
 against the *whole* timeline (pass A), and events are then detected on
-chrome-free masks (pass B). Frames stream from an ffmpeg pipe — nothing is
+chrome-free masks (pass B). Frames stream from an ffmpeg pipe - nothing is
 written to disk during detection.
 
 ## How the ticker is separated (the subtle part)
 
-A scrolling ticker fails the "60% stable" test almost everywhere — every
+A scrolling ticker fails the "60% stable" test almost everywhere - every
 pixel is lit only while a letter sweeps past. But Devanagari has the
 शिरोरेखा, the horizontal headline stroke running along the top of every
 word. Under horizontal scroll that stroke overlaps *itself*, so its pixels
@@ -96,12 +96,12 @@ stable pixels to ever-lit pixels**:
 ```mermaid
 flowchart LR
     A["row block"] --> B{"stable pixels /<br/>ever-lit pixels"}
-    B -- "≈ 1.0 (measured 0.996–1.0)" --> C["subtitle — keep"]
-    B -- "≈ 0.2 (measured 0.19–0.20)" --> D["ticker — drop"]
+    B -- "≈ 1.0 (measured 0.996-1.0)" --> C["subtitle - keep"]
+    B -- "≈ 0.2 (measured 0.19-0.20)" --> D["ticker - drop"]
 ```
 
 A subtitle's pixels are *all* stable. A ticker block is a huge smear of
-ever-lit pixels with only the शिरोरेखा streak stable — the ratio collapses.
+ever-lit pixels with only the शिरोरेखा streak stable - the ratio collapses.
 Cutoff is 0.5, with a factor-of-two margin to both measured sides.
 
 ## Module map
@@ -131,7 +131,7 @@ guessing:
 | `MIN_TEXT_PIXELS` | 120 | fewer lit pixels ⇒ no subtitle present | noise floor |
 | `MIN_EVENT_S` / `MAX_EVENT_S` | 0.4 / 15.0 | events shorter are blips, longer are disclaimers | sampling floor / persistent-text screen |
 | `STABLE_PIXEL_FRACTION` | 0.6 | lit fraction of event ⇒ pixel belongs to the subtitle | scrolling ticker fragments events |
-| `MIN_CLUSTER_STABILITY` | 0.5 | row block stable/ever-lit ratio below ⇒ ticker, drop | subtitles measure 0.996–1.0, ticker 0.19–0.20 on real footage |
+| `MIN_CLUSTER_STABILITY` | 0.5 | row block stable/ever-lit ratio below ⇒ ticker, drop | subtitles measure 0.996-1.0, ticker 0.19-0.20 on real footage |
 | `ROW_CLUSTER_GAP` | 6 | row gap (detection px) that splits text blocks | wrapped subtitle lines sit closer than subtitle sits to ticker |
 
 Two ffmpeg details matter and are easy to break:
@@ -139,7 +139,7 @@ Two ffmpeg details matter and are easy to break:
 - Band scaling uses `flags=neighbor`. Bilinear scaling averages thin
   anti-aliased strokes below the 190 threshold and text silently vanishes.
 - Detection runs at 4 fps on a 640px-wide band. That fixes the timing
-  resolution at ±0.25s — good enough for matching against speech.
+  resolution at ±0.25s - good enough for matching against speech.
 
 ## How to check it still works
 
@@ -152,7 +152,7 @@ subtitle-checker check --video path/to/video.mp4 --lang hi
 Prints every event and writes `<stem>_subtitle_events.json`. Eyeball: real
 subtitle lines present, no ticker text or logo characters mixed in.
 
-Second, the closed-loop evaluation — the real safety net:
+Second, the closed-loop evaluation - the real safety net:
 
 ```
 subtitle-checker eval-detection --clean-clip path/to/clean_clip.mp4 --lang hi
@@ -161,7 +161,7 @@ subtitle-checker eval-detection --clean-clip path/to/clean_clip.mp4 --lang hi
 This burns **known** Hindi lines onto a clip that has no subtitles (ffmpeg
 + libass), runs Stage 1 on the result, and scores detection against the
 truth it just burned. Because we authored the truth, recall, timing error
-and OCR similarity are exact — no hand labelling.
+and OCR similarity are exact - no hand labelling.
 
 Reference numbers on real footage (a clean 60s segment of a broadcast
 episode **with a live news ticker running below**):
@@ -178,11 +178,11 @@ round trip.
 
 - **Credits, promos, static disclaimer chips** that behave exactly like a
   subtitle (bright, still, a few seconds) are detected as events. Correct
-  for Stage 1 — they *are* on-screen text. Stage 3 decides against the
+  for Stage 1 - they *are* on-screen text. Stage 3 decides against the
   audio whether text belongs there.
 - **Sparkle inside the text box** (e.g. jewellery right next to a
   subtitle) occasionally pollutes OCR. Confidence drops and flags it.
-- **Sparkle-only events** on ornate footage come out with confidence ≈0 —
+- **Sparkle-only events** on ornate footage come out with confidence ≈0 -
   filterable downstream, kept because "something bright was there" is
   information.
 - OCR on **hard backgrounds** (bright clothing, glare) gives honestly low

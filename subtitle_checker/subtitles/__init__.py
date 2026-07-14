@@ -1,7 +1,7 @@
-"""Stage 1 — subtitle track reconstruction.
+"""Stage 1 - subtitle track reconstruction.
 
 Input: video file.
-Output: ``subtitle_events`` artifact — one entry per burned-in subtitle line
+Output: ``subtitle_events`` artifact - one entry per burned-in subtitle line
 with exact on/off timestamps.
 
 Approach: sample the subtitle band at a few fps, binarize to a text mask, and

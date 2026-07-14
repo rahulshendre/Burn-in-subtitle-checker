@@ -1,6 +1,6 @@
 """Extract a video's audio track as mono 16 kHz float32 samples.
 
-Samples stream straight out of an ffmpeg pipe — nothing lands on disk.
+Samples stream straight out of an ffmpeg pipe - nothing lands on disk.
 16 kHz mono is the native format for VAD and every ASR/alignment backend
 downstream, so the conversion happens exactly once, here.
 """

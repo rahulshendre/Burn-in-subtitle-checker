@@ -51,7 +51,7 @@ def test_speech_fully_covered_by_subtitle_is_not_missing() -> None:
 
 
 def test_short_uncovered_speech_below_floor_is_ignored() -> None:
-    # only 0.3 s of speech pokes out past the subtitle — under the floor
+    # only 0.3 s of speech pokes out past the subtitle - under the floor
     events = [SubtitleEvent(2.0, 3.7, "लगभग ढका")]
     regions = [AudioRegion(2.0, 4.0, AudioKind.SPEECH)]
     assert _verdicts(check_structural(events, regions), Verdict.MISSING_SUBTITLE) == []
@@ -74,7 +74,7 @@ def test_missing_flag_spans_only_the_uncovered_gap() -> None:
 
 
 def test_fragmented_missing_speech_merges_to_one_flag() -> None:
-    # one unsubtitled stretch, VAD split by a bar of music — no subtitle anywhere
+    # one unsubtitled stretch, VAD split by a bar of music - no subtitle anywhere
     events: list[SubtitleEvent] = []
     regions = [
         AudioRegion(0.0, 5.0, AudioKind.SPEECH),

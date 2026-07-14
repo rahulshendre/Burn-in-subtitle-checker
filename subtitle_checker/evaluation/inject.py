@@ -48,7 +48,7 @@ def make_test_video(
     stem = Path(video).stem
 
     # A defect planted past the end of the video silently never renders and
-    # would be scored as "missed" — corrupting the numbers, not testing them.
+    # would be scored as "missed" - corrupting the numbers, not testing them.
     duration = _video_duration(Path(video))
     last_end = max(e.end for e in truth_events)
     if last_end + MAX_SHIFT_S > duration:

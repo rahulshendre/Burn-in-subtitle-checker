@@ -70,7 +70,7 @@ def plan_defects(
 ) -> tuple[list[SubtitleEvent], list[Defect]]:
     """Plant one defect of each requested type; return (mutated events, labels).
 
-    ``types`` selects which defects to plant (default: all of them) — a later
+    ``types`` selects which defects to plant (default: all of them) - a later
     stage's eval can ask for only the defects it is meant to catch. Victim lines
     are chosen with a seeded RNG so the same input always yields the same test
     video; with the full set the choice is identical to planting them directly.
@@ -168,7 +168,7 @@ def _make_extra_line(
 ) -> tuple[SubtitleEvent, Defect]:
     """Build a subtitle line sitting in the largest silent gap.
 
-    Silence is judged from the *truth* timeline — the audio never changes, so
+    Silence is judged from the *truth* timeline - the audio never changes, so
     speech sits wherever truth subtitles sat, even for lines the mutations
     dropped or moved. Collision is judged against the *mutated* timeline so
     the extra line never overlaps a line that was shifted into the gap.

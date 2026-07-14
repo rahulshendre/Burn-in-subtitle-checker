@@ -1,4 +1,4 @@
-"""ASR cross-check logic over a scripted engine — no network, real rapidfuzz."""
+"""ASR cross-check logic over a scripted engine - no network, real rapidfuzz."""
 
 from __future__ import annotations
 

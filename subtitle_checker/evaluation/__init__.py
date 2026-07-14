@@ -1,4 +1,4 @@
-"""Evaluation harness — the pipeline is scored, not vibed.
+"""Evaluation harness - the pipeline is scored, not vibed.
 
 Two parts:
 

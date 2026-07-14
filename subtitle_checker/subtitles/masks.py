@@ -1,7 +1,7 @@
 """Binary text masks and their comparison.
 
 Subtitle text on SLS content is high-luminance: white fill, and the karaoke
-highlight is yellow — still bright in grayscale. A luminance threshold
+highlight is yellow - still bright in grayscale. A luminance threshold
 therefore isolates the text *shape*, and comparing shapes instead of raw
 pixels keeps the word-by-word highlight sweep from looking like a text
 change.
@@ -50,7 +50,7 @@ def _dilate(mask: np.ndarray) -> np.ndarray:
 def remove_fat_regions(mask: np.ndarray, thickness: int = 3) -> np.ndarray:
     """Drop bright regions thicker than text strokes.
 
-    Subtitle strokes are 2–3 px at detection scale; bright clothing, skin,
+    Subtitle strokes are 2-3 px at detection scale; bright clothing, skin,
     or sky are solid blobs. Erosion kills anything thinner than
     ``thickness``; dilating the survivors back and subtracting removes the
     fat regions while the strokes stay.

@@ -2,7 +2,7 @@
 
 The renderer (report.html) is pure: it asks an Evidence provider for the media
 each card embeds. This module implements that provider against the source video
-with two short ffmpeg calls — a scaled PNG frame at a timestamp, and a small MP3
+with two short ffmpeg calls - a scaled PNG frame at a timestamp, and a small MP3
 clip of a span. Both stream to stdout, so nothing touches disk. A failed or
 empty ffmpeg run returns None and the renderer draws a placeholder: a report
 must still generate even if one snippet cannot be cut.

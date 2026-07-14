@@ -136,7 +136,7 @@ def _run_report(args: argparse.Namespace) -> int:
 
     out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
     skipped = _load_skipped(results_path, video, results)
-    write_report(video, results, out, title=f"Subtitle check — {video.stem}", skipped=skipped)
+    write_report(video, results, out, title=f"Subtitle check - {video.stem}", skipped=skipped)
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
 
@@ -182,7 +182,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
         audio = extract_audio(video)
         regions = label_regions(audio, vad)
     except ImportError:
-        print("audio stage skipped — install the extra with: pip install '.[audio]'")
+        print("audio stage skipped - install the extra with: pip install '.[audio]'")
         return
 
     save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
@@ -209,7 +209,7 @@ def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
         aligner = MmsAligner(lang=_UROMAN_LANG.get(lang, "hin"))
         scores = score_events(events, audio, aligner)
     except ImportError:
-        print("alignment stage skipped — install the extra with: pip install '.[align]'")
+        print("alignment stage skipped - install the extra with: pip install '.[align]'")
         return []
     return check_alignment(scores, regions)
 
@@ -219,7 +219,7 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
     import os
 
     if not os.environ.get("SARVAM_API_KEY"):
-        print("ASR cross-check skipped — set SARVAM_API_KEY to enable it")
+        print("ASR cross-check skipped - set SARVAM_API_KEY to enable it")
         return []
     from subtitle_checker.match.asr import SarvamAsr, transcribe_lines
 
@@ -227,7 +227,7 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
         engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
         return transcribe_lines(events, audio, regions, engine)
     except ImportError:
-        print("ASR cross-check skipped — install the extra with: pip install '.[asr]'")
+        print("ASR cross-check skipped - install the extra with: pip install '.[asr]'")
         return []
 
 
@@ -263,7 +263,7 @@ def _write_report(video: Path, results: list, out_dir: Path, skipped: list | Non
     from subtitle_checker.report.evidence import write_report
 
     path = out_dir / f"{video.stem}_report.html"
-    write_report(video, results, path, title=f"Subtitle check — {video.stem}", skipped=skipped)
+    write_report(video, results, path, title=f"Subtitle check - {video.stem}", skipped=skipped)
     print(f"report -> {path}")
 
 

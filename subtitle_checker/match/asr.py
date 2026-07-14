@@ -1,13 +1,13 @@
 """Stage 3 secondary signal: ASR cross-check.
 
 Forced alignment (align.py) catches gross mismatches but not single-word errors
-— a swapped word barely moves the alignment score. An Indic-specialised ASR
+- a swapped word barely moves the alignment score. An Indic-specialised ASR
 does catch them: transcribe the audio under a subtitle and compare the words.
 Sarvam Saarika reads Devanagari off noisy PlanetRead audio far better than
 Whisper (the six-month finding), so it is the default engine; the AsrEngine
 Protocol keeps it swappable and lets the pipeline and tests run with no network.
 
-The comparison is rapidfuzz token_set_ratio — order-insensitive, which suits
+The comparison is rapidfuzz token_set_ratio - order-insensitive, which suits
 Indic word-order drift and the fact that ASR and OCR tokenise a little
 differently. A low ratio on a line alignment let pass is a word-level
 TEXT_MISMATCH. Precision-first: only trusted lines (speech under them, decent
@@ -31,11 +31,11 @@ SAMPLE_RATE = 16_000
 # A little grace so the first/last word of a line is not clipped from the window.
 WINDOW_PAD_S = 0.3
 # token_set_ratio is 0-100. Live Sarvam on real audio: correct lines cluster
-# 82-100, gross divergence ~30, and single-word swaps sit at 75-93 — overlapping
+# 82-100, gross divergence ~30, and single-word swaps sit at 75-93 - overlapping
 # correct, because OCR and ASR already disagree ~15% on spelling and word order.
 # So the cut flags only gross mismatches: it spares correct lines and misses
 # subtle single-word swaps (those are surfaced heard-vs-written in the report for
-# the editor, not auto-flagged — no full-line text metric separates them).
+# the editor, not auto-flagged - no full-line text metric separates them).
 MIN_TOKEN_RATIO = 65.0
 # Match alignment's trust gates: do not cross-check garbled OCR or tiny lines.
 MIN_OCR_CONF = 0.5
@@ -109,7 +109,7 @@ def _heard_line(
     shared trust gate behind both the flags and the report ledger.
     """
     if not event_has_speech(event, regions):
-        return None  # no speech to transcribe — structural's call
+        return None  # no speech to transcribe - structural's call
     if event.confidence < min_ocr_conf or len(event.text.split()) < min_words:
         return None  # untrusted or too short to compare word-for-word
     w0 = max(0.0, event.start - pad)
@@ -119,7 +119,7 @@ def _heard_line(
         return None
     heard = engine.transcribe(window)
     if not heard:
-        return None  # ASR heard nothing — abstain rather than accuse
+        return None  # ASR heard nothing - abstain rather than accuse
     return heard, token_set_ratio(event.text, heard)
 
 
@@ -136,8 +136,8 @@ def transcribe_lines(
 ) -> list[CheckResult]:
     """Transcribe every comparable line for the report's heard-vs-written ledger.
 
-    One CheckResult per trusted, speech-covered line — OK when the heard words
-    match the subtitle, TEXT_MISMATCH when they diverge grossly — each carrying
+    One CheckResult per trusted, speech-covered line - OK when the heard words
+    match the subtitle, TEXT_MISMATCH when they diverge grossly - each carrying
     heard_text. The OK rows are what let an editor eyeball the subtle single-word
     errors that sit below the auto-flag noise floor (see the module docstring).
     """

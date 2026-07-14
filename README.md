@@ -5,12 +5,12 @@ burned-in subtitles of a video file, so QA reviewers only need to check the
 flagged moments instead of scrubbing the whole video.
 
 Built for PlanetRead's Same Language Subtitling (SLS) content under
-C4GT DMP 2026 — see issue
+C4GT DMP 2026 - see issue
 [#3](https://github.com/PlanetRead/Burn-in-subtitle-checker/issues/3).
 
 ## How it works
 
-The subtitle track is reconstructed first (it is the reliable signal — burned-in
+The subtitle track is reconstructed first (it is the reliable signal - burned-in
 text is clean and consistent), then the audio is checked *against* it:
 
 | Stage | Module | Output |

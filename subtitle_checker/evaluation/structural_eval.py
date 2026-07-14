@@ -1,7 +1,7 @@
 """Closed-loop evaluation of the Stage 2 structural flags.
 
 Build a ground-truth audio-region timeline straight from verified truth
-subtitle lines — each line is speech, the gaps between are silence — then plant
+subtitle lines - each line is speech, the gaps between are silence - then plant
 the two structural defects (a dropped line, an extra line) and confirm the
 structural checker flags them, scored automatically against the labels.
 
@@ -24,7 +24,7 @@ STRUCTURAL_DEFECTS = [DefectType.DROP_LINE, DefectType.EXTRA_LINE]
 
 
 def regions_from_truth(events: list[SubtitleEvent]) -> list[AudioRegion]:
-    """Speech under each truth line, silence in the gaps — the clean timeline."""
+    """Speech under each truth line, silence in the gaps - the clean timeline."""
     ordered = sorted(events, key=lambda e: e.start)
     regions: list[AudioRegion] = []
     cursor = 0.0
@@ -41,7 +41,7 @@ def evaluate_structural(
 ) -> tuple[EvalScore, list[CheckResult]]:
     """Plant drop/extra defects on truth, run structural checks, and score them.
 
-    Regions come from the *truth* timeline — the audio never changes, so a
+    Regions come from the *truth* timeline - the audio never changes, so a
     dropped subtitle still has speech under it (→ MISSING) and an extra line
     still sits in silence (→ ORPHAN).
     """

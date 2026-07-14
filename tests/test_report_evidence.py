@@ -1,4 +1,4 @@
-"""ffmpeg evidence extractor — cuts real frames and audio from a synthetic clip."""
+"""ffmpeg evidence extractor - cuts real frames and audio from a synthetic clip."""
 
 from __future__ import annotations
 

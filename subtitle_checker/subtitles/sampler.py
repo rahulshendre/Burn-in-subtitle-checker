@@ -1,6 +1,6 @@
 """Sample the subtitle band of a video as grayscale frames.
 
-Frames stream straight out of an ffmpeg rawvideo pipe — nothing lands on
+Frames stream straight out of an ffmpeg rawvideo pipe - nothing lands on
 disk. The detection pass reads a downscaled band; OCR re-extracts single
 frames at native resolution.
 """

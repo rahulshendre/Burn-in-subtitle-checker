@@ -39,8 +39,8 @@ def test_iou_partial_overlap() -> None:
 
 def test_fat_filter_keeps_strokes_drops_blobs() -> None:
     mask = np.zeros((40, 100), dtype=bool)
-    mask[10:13, 5:45] = True  # 3 px stroke — text-like
-    mask[20:38, 50:95] = True  # 18 px solid blob — clothing-like
+    mask[10:13, 5:45] = True  # 3 px stroke - text-like
+    mask[20:38, 50:95] = True  # 18 px solid blob - clothing-like
     cleaned = remove_fat_regions(mask, thickness=3)
     assert cleaned[11, 20]  # stroke survives
     assert not cleaned[29, 70]  # blob core removed
@@ -57,7 +57,7 @@ def test_text_mask_composes_threshold_and_fat_filter() -> None:
     gray = np.zeros((40, 100), dtype=np.uint8)
     gray[10:13, 5:45] = 255  # bright stroke
     gray[20:38, 50:95] = 255  # bright blob
-    gray[30:32, 5:45] = 100  # dim stroke — under threshold
+    gray[30:32, 5:45] = 100  # dim stroke - under threshold
     cleaned = text_mask(gray)
     assert cleaned[11, 20]
     assert not cleaned[29, 70]

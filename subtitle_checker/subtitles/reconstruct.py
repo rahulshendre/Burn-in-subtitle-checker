@@ -62,7 +62,7 @@ def reconstruct_subtitles(
     """Full Stage 1: detect events, OCR each once, return the subtitle track.
 
     Events where OCR finds no text are kept with empty text and zero
-    confidence — "something bright was there but unreadable" is a signal the
+    confidence - "something bright was there but unreadable" is a signal the
     matcher wants, not something to hide.
     """
     engine = engine or EasyOcrEngine()

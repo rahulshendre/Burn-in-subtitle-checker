@@ -1,4 +1,4 @@
-"""Video ingest — audio track extraction and frame access.
+"""Video ingest - audio track extraction and frame access.
 
 Input: video file.
 Output: audio track (wav) plus frame access for the subtitle stage.

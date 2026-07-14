@@ -3,7 +3,7 @@
 Burn known truth lines onto a clean (subtitle-free) clip with the harness
 burner, run the Stage 1 detector on the result, and measure how much of the
 truth came back: recall, timing error, and OCR text similarity. Run it on a
-segment of real broadcast footage — logos, tickers and all — and the numbers
+segment of real broadcast footage - logos, tickers and all - and the numbers
 say how the detector behaves in production conditions, not on synthetics.
 """
 

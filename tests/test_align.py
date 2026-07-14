@@ -1,4 +1,4 @@
-"""Pure alignment scoring over a fake aligner — no torch, no model."""
+"""Pure alignment scoring over a fake aligner - no torch, no model."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from subtitle_checker.match.align import (
     score_events,
 )
 
-# Ten seconds of silence — long enough that every event window has samples.
+# Ten seconds of silence - long enough that every event window has samples.
 AUDIO = np.zeros(SAMPLE_RATE * 10, dtype=np.float32)
 
 # Sentinel standing in for an injected wrong word (see evaluation.defects).

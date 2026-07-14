@@ -1,4 +1,4 @@
-"""Stage 4 renderer tests — pure HTML, no ffmpeg or network.
+"""Stage 4 renderer tests - pure HTML, no ffmpeg or network.
 
 Evidence is faked so the renderer is exercised in isolation: the media it embeds
 is opaque bytes here; the ffmpeg-backed extractor is tested separately.
@@ -21,7 +21,7 @@ class FakeEvidence:
 
 
 class NullEvidence:
-    """No media available — the renderer must degrade gracefully."""
+    """No media available - the renderer must degrade gracefully."""
 
     def frame_png(self, t: float) -> None:
         return None
@@ -91,7 +91,7 @@ def test_score_shown_as_percent():
 
 def test_missing_subtitle_placeholder_when_no_text():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "— no subtitle —" in out  # MISSING flag has empty subtitle_text
+    assert "- no subtitle -" in out  # MISSING flag has empty subtitle_text
 
 
 def test_no_flags_message():

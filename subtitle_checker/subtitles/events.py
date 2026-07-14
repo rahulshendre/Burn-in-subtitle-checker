@@ -2,13 +2,13 @@
 
 Two passes over the sampled band:
 
-1. Presence pass — how often each pixel, and each pixel's neighborhood, is lit
+1. Presence pass - how often each pixel, and each pixel's neighborhood, is lit
    across the video. Pixels lit most of the time are chrome (channel bugs,
    watermarks); a whole little region lit most of the time even when no single
    pixel stays on is an animated logo whose shine sweeps ("TATA PLAY",
    "MELBON"). Both are chrome, not subtitles, and get removed from every mask
    before detection.
-2. Event pass — a run of consecutive frames whose masks stay similar is one
+2. Event pass - a run of consecutive frames whose masks stay similar is one
    subtitle event; the text changing (IoU drop) or vanishing closes it.
 """
 
@@ -32,7 +32,7 @@ CHROME_PRESENCE = 0.5
 # An animated logo (a channel bug whose shine sweeps) never keeps one pixel lit,
 # so per-pixel presence slips past it. But *something* in its little box is
 # bright every frame: a pixel whose neighborhood is occupied for this fraction
-# of the video is chrome too. The footprint is (rows, cols) at detection scale —
+# of the video is chrome too. The footprint is (rows, cols) at detection scale -
 # wide enough to bridge the sweep, short enough not to reach from a corner logo
 # up into a subtitle line.
 CHROME_REGION_PRESENCE = 0.8
@@ -47,8 +47,8 @@ MAX_EVENT_S = 15.0
 STABLE_PIXEL_FRACTION = 0.6
 # A horizontal text block whose lit pixels were mostly transient is a
 # scrolling ticker sweeping through, not a subtitle. (A ticker still leaks
-# two stable streaks — its सूचना-style label chip and the Devanagari
-# headline stroke, which scrolling never moves — so the block's *ratio* of
+# two stable streaks - its सूचना-style label chip and the Devanagari
+# headline stroke, which scrolling never moves - so the block's *ratio* of
 # stable to ever-lit pixels is the tell: real subtitles measure ~1.0,
 # scrolling tickers ~0.2.)
 MIN_CLUSTER_STABILITY = 0.5
@@ -65,7 +65,7 @@ class RawEvent:
     start: float
     end: float
     # union bounding box of the text pixels, in detection-scale coordinates:
-    # (row0, row1, col0, col1) — lets OCR crop to the text and ignore the
+    # (row0, row1, col0, col1) - lets OCR crop to the text and ignore the
     # bright scenery around it
     bbox: tuple[int, int, int, int] | None = None
 
@@ -128,7 +128,7 @@ def presence_fields(
     """Per-pixel and region presence over the mask stream, in one pass.
 
     Region presence max-pools each frame's mask before accumulating, so it
-    measures how often *something* is lit in a pixel's neighborhood — a
+    measures how often *something* is lit in a pixel's neighborhood - a
     sweeping logo shine registers here every frame even when no single pixel
     stays lit. Returned next to the plain per-pixel presence so chrome_mask can
     use both.
@@ -158,8 +158,8 @@ def chrome_mask(
 ) -> np.ndarray:
     """Pixels persistent enough to be chrome rather than subtitles.
 
-    A pixel is chrome if it is lit for ``cutoff`` of the video, or — when
-    ``region_presence`` is supplied — if its neighborhood is occupied for
+    A pixel is chrome if it is lit for ``cutoff`` of the video, or - when
+    ``region_presence`` is supplied - if its neighborhood is occupied for
     ``region_cutoff`` of it, which catches animated logos the per-pixel test
     slips past.
     """
@@ -181,7 +181,7 @@ def detect_events(
 
     With ``stabilize``, each mask is ANDed with the previous frame's raw
     mask: subtitle text persists across frames while sequins, jewellery and
-    other bright sparkle move every frame — the AND keeps the text and kills
+    other bright sparkle move every frame - the AND keeps the text and kills
     the flicker (costs one sample of latency on event starts).
     """
     events: list[RawEvent] = []

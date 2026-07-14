@@ -32,7 +32,7 @@ def test_event_without_speech_is_left_to_structural() -> None:
 
 
 def test_low_ocr_confidence_abstains() -> None:
-    # garbled OCR scores low too, so a low score here is not evidence — no flag
+    # garbled OCR scores low too, so a low score here is not evidence - no flag
     assert check_alignment([_score(0.1, ocr_confidence=0.2)], SPEECH) == []
 
 
@@ -41,7 +41,7 @@ def test_unalignable_none_score_abstains() -> None:
 
 
 def test_short_line_low_score_abstains() -> None:
-    # a 0.6 s line aligns unreliably low even when correct — must not be flagged
+    # a 0.6 s line aligns unreliably low even when correct - must not be flagged
     assert check_alignment([_score(0.1, start=1.0, end=1.6)], SPEECH) == []
 
 
@@ -72,5 +72,5 @@ def test_rescue_does_not_require_min_span() -> None:
 
 
 def test_trusted_line_is_not_double_verified() -> None:
-    # a good score with trustworthy OCR stays silent — the ASR ledger owns its OK
+    # a good score with trustworthy OCR stays silent - the ASR ledger owns its OK
     assert check_alignment([_score(0.6, ocr_confidence=0.9)], SPEECH) == []

@@ -1,14 +1,14 @@
-"""Structural checks — the cheapest, most robust signal, zero ASR.
+"""Structural checks - the cheapest, most robust signal, zero ASR.
 
 Cross the subtitle timeline against the audio-region timeline and flag the two
 anomalies that need no word recognition at all:
 
-* MISSING_SUBTITLE — the audio has speech that no subtitle covers.
-* ORPHAN_SUBTITLE — a subtitle sits over silence, with no speech beneath it.
+* MISSING_SUBTITLE - the audio has speech that no subtitle covers.
+* ORPHAN_SUBTITLE - a subtitle sits over silence, with no speech beneath it.
 
 A subtitle over *music* is neither: sung or scored dialogue can slip past the
 VAD, so calling it an orphan would be a false accusation. Those become
-UNCHECKABLE — an honest "can't tell here" rather than a wrong flag.
+UNCHECKABLE - an honest "can't tell here" rather than a wrong flag.
 
 Subtitles that do have speech under them are left untouched; verifying that the
 *words* match is Stage 3's job, not this one.
@@ -31,7 +31,7 @@ COVER_PAD_S = 0.5
 # overlaps speech. Low on purpose: any real speech under it clears it.
 SPEECH_COVER_MIN = 0.3
 # With no speech, this much music overlap makes a subtitle UNCHECKABLE rather
-# than an orphan — the benefit of the doubt goes to "maybe sung".
+# than an orphan - the benefit of the doubt goes to "maybe sung".
 MUSIC_COVER_MIN = 0.5
 
 
@@ -47,7 +47,7 @@ def event_has_speech(event: SubtitleEvent, regions: list[AudioRegion]) -> bool:
     """True when speech covers enough of the event to make its words Stage 3's job.
 
     The same test structural uses to skip an event (below) and alignment uses to
-    claim it — so the two stages partition the events with no overlap and no gap.
+    claim it - so the two stages partition the events with no overlap and no gap.
     """
     span = event.end - event.start
     if span <= 0:
@@ -61,7 +61,7 @@ def _merge_missing(
     """Collapse consecutive MISSING flags into one span.
 
     One unsubtitled stretch of speech gets fragmented when the VAD splits it
-    across regions (a breath or a bar of music between clauses) — that should
+    across regions (a breath or a bar of music between clauses) - that should
     read as a single missing line, not several. Two flags are merged when they
     overlap or when nothing but the gap sits between them; a *subtitle* in the
     gap means they are genuinely separate drops and they stay apart.
@@ -111,13 +111,13 @@ def check_structural(
     """Flag speech with no subtitle and subtitles with no speech."""
     results: list[CheckResult] = []
 
-    # ORPHAN / UNCHECKABLE — judged per subtitle event.
+    # ORPHAN / UNCHECKABLE - judged per subtitle event.
     for event in events:
         span = event.end - event.start
         if span <= 0:
             continue
         if event_has_speech(event, regions):
-            continue  # has dialogue — Stage 3 checks the words
+            continue  # has dialogue - Stage 3 checks the words
         music = _kind_overlap(event, regions, AudioKind.MUSIC)
         if music / span >= MUSIC_COVER_MIN:
             results.append(
@@ -125,7 +125,7 @@ def check_structural(
                     start=event.start,
                     end=event.end,
                     verdict=Verdict.UNCHECKABLE,
-                    reason="subtitle over music — speech not verifiable without separation",
+                    reason="subtitle over music - speech not verifiable without separation",
                     subtitle_text=event.text,
                 )
             )
@@ -140,7 +140,7 @@ def check_structural(
                 )
             )
 
-    # MISSING — speech the subtitles never cover. Each subtitle is padded so a
+    # MISSING - speech the subtitles never cover. Each subtitle is padded so a
     # brief blink between consecutive lines does not read as a gap in coverage.
     covers = [(e.start - COVER_PAD_S, e.end + COVER_PAD_S) for e in events]
     missing: list[CheckResult] = []

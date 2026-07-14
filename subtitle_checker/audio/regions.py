@@ -5,7 +5,7 @@ gap is classified MUSIC or SILENCE by its energy. The result covers the whole
 track end to end, so a downstream structural check can ask "what is under this
 subtitle?" for any timestamp and always get an answer.
 
-SONG is deliberately not emitted yet — separating sung vocals from a backing
+SONG is deliberately not emitted yet - separating sung vocals from a backing
 score needs source separation (Stage 2's optional step). Emitting a SONG label
 we can't yet stand behind would be dishonest; MUSIC/SPEECH is the coarse split
 the plan calls for.
@@ -26,7 +26,7 @@ MUSIC_RMS_FLOOR = 0.015
 
 
 def _median_window_rms(samples: np.ndarray, sample_rate: int) -> float:
-    """Median RMS across 100 ms windows — ignores one-off transient spikes."""
+    """Median RMS across 100 ms windows - ignores one-off transient spikes."""
     if samples.size == 0:
         return 0.0
     win = max(1, int(WINDOW_S * sample_rate))

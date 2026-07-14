@@ -18,7 +18,7 @@ AUDIO = np.zeros(16_000 * 20, dtype=np.float32)
 
 
 class MatchAligner:
-    """Scores 0.9 for a known-correct line, 0.3 for anything else — stands in
+    """Scores 0.9 for a known-correct line, 0.3 for anything else - stands in
     for an aligner that recognises the true transcript over the audio."""
 
     def __init__(self, correct_texts: set[str]) -> None:

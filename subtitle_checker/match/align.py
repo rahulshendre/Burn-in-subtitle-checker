@@ -1,7 +1,7 @@
-"""Forced alignment — Stage 3's primary signal.
+"""Forced alignment - Stage 3's primary signal.
 
 The subtitle text is known and trustworthy (Stage 1 OCR). The question is not
-"what was said?" but "was THIS line spoken here?" — verification, not open
+"what was said?" but "was THIS line spoken here?" - verification, not open
 transcription. Forced alignment answers it: score the known words against the
 audio under the subtitle. A low score means those words were not spoken in that
 window.
@@ -9,7 +9,7 @@ window.
 Scoring known text sidesteps the whole hallucination failure class that sank
 open ASR (Whisper) on this footage. The aligner is a CTC model (torchaudio's
 MMS_FA bundle) covering Hindi, Marathi, and Kannada; the Protocol keeps it
-swappable and lets the pipeline and the tests run without torch — exactly how
+swappable and lets the pipeline and the tests run without torch - exactly how
 SileroVad sits behind VoiceActivityDetector in audio.vad.
 
 MMS aligns romanized text, so the concrete aligner transliterates Devanagari
@@ -72,7 +72,7 @@ class ForcedAligner(Protocol):
 def _mean_score(spans: list[WordSpan]) -> float:
     """Frame-count-weighted mean of per-word scores.
 
-    A longer word carries more acoustic evidence, so it weighs more — one short
+    A longer word carries more acoustic evidence, so it weighs more - one short
     filler word scoring low should not sink an otherwise solid line. Falls back
     to a plain mean when every span is zero-length.
     """
@@ -98,7 +98,7 @@ def score_event(
     window = audio[int(w0 * sample_rate) : int(w1 * sample_rate)]
     spans = aligner.align(window, event.text) if window.size else []
     if not spans:
-        # Could not align at all — empty text, or a window too short to fit the
+        # Could not align at all - empty text, or a window too short to fit the
         # line's tokens under the CTC length rule. That is not a mismatch, so
         # score is None and the verdict layer marks it UNCHECKABLE, never
         # TEXT_MISMATCH.
@@ -186,7 +186,7 @@ class MmsAligner:
             except RuntimeError as exc:
                 # CTC needs at least one audio frame per target token (plus
                 # adjacent repeats). A very short event carrying a full line of
-                # text — a Stage-1 flash or split duplicate — violates that. It
+                # text - a Stage-1 flash or split duplicate - violates that. It
                 # is unverifiable here, not wrong, so return no spans.
                 if "targets length is too long" in str(exc):
                     return []

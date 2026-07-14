@@ -1,13 +1,13 @@
-"""Stage 4 — render check results into a self-contained HTML report.
+"""Stage 4 - render check results into a self-contained HTML report.
 
 The report is the editor-facing surface of the whole pipeline: one HTML file,
 no server, no external assets. Every flag becomes a card carrying the evidence a
-non-technical reviewer needs to judge it in seconds — a frame from the subtitle,
+non-technical reviewer needs to judge it in seconds - a frame from the subtitle,
 the written text beside what the ASR heard, a short audio snippet to play, and
 the verdict reason. Flags are grouped worst-first; when the run also carries the
 per-line ledger (OK rows with heard-vs-written), a scan table lists the matching
 lines so the editor can still catch the subtle word errors the pipeline
-deliberately does not auto-flag — they sit below the OCR/ASR noise floor (see
+deliberately does not auto-flag - they sit below the OCR/ASR noise floor (see
 match.asr).
 
 Evidence (frames, audio) is supplied through the Evidence protocol so this
@@ -114,7 +114,7 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
     headline = (
         f"{n_flags} flag(s) for review"
         if n_flags
-        else "No flags — every checked line matches the audio"
+        else "No flags - every checked line matches the audio"
     )
     return (
         f'<header><h1>{html.escape(title)}</h1>'
@@ -123,7 +123,7 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         f'<div class="chips">{chips}</div>'
         "<p class=\"note\">Each card shows the subtitle frame, the written text beside "
         "what the ASR heard, and an audio snippet to verify. Subtle single-word errors "
-        "are not auto-flagged — scan the heard-vs-written column below to catch them.</p>"
+        "are not auto-flagged - scan the heard-vs-written column below to catch them.</p>"
         "</header>"
     )
 
@@ -144,13 +144,13 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
     score = (
         f'<span class="score">match {r.score:.0%}</span>' if r.score is not None else ""
     )
-    written = html.escape(r.subtitle_text.strip()) or '<em class="none">— no subtitle —</em>'
-    heard = html.escape(r.heard_text.strip()) or '<em class="none">— not transcribed —</em>'
+    written = html.escape(r.subtitle_text.strip()) or '<em class="none">- no subtitle -</em>'
+    heard = html.escape(r.heard_text.strip()) or '<em class="none">- not transcribed -</em>'
     return (
         f'<article class="card" style="border-left:6px solid {color}">'
         f'<div class="card-head">'
         f'<span class="badge" style="background:{color}">{_VERDICT_LABEL[r.verdict]}</span>'
-        f'<span class="tspan">{_ts(r.start)} – {_ts(r.end)}</span>{score}</div>'
+        f'<span class="tspan">{_ts(r.start)} - {_ts(r.end)}</span>{score}</div>'
         f'<div class="card-body">'
         f'<div class="frame">{frame}</div>'
         f'<div class="detail">'
@@ -168,7 +168,7 @@ def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
         return ""
     rows = "\n".join(_ledger_row(r, evidence) for r in oks)
     return (
-        '<section class="ledger"><h2>Matching lines — heard vs written</h2>'
+        '<section class="ledger"><h2>Matching lines - heard vs written</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
         '<table><thead><tr><th>Time</th><th>Frame</th><th>Written</th>'
@@ -182,8 +182,8 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
-    written = html.escape(r.subtitle_text.strip()) or "—"
-    heard = html.escape(r.heard_text.strip()) or '<em class="none">—</em>'
+    written = html.escape(r.subtitle_text.strip()) or "-"
+    heard = html.escape(r.heard_text.strip()) or '<em class="none">-</em>'
     return (
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
@@ -200,7 +200,7 @@ def _skipped_section(
     return (
         f'<section class="skipped"><h2>Skipped lines ({len(skipped)})</h2>'
         '<p class="note">These subtitles were detected but not verified '
-        "word-for-word — checking them against the audio would risk a false "
+        "word-for-word - checking them against the audio would risk a false "
         "alarm. Each row says why.</p>"
         '<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle (OCR read)</th>'
         "<th>Why skipped</th></tr></thead><tbody>"
@@ -210,7 +210,7 @@ def _skipped_section(
 
 def _skipped_row(e: SubtitleEvent, reason: str, evidence: Evidence) -> str:
     thumb = _thumb_html(evidence.frame_png((e.start + e.end) / 2.0))
-    text = html.escape(e.text.strip()) or '<em class="none">— unreadable —</em>'
+    text = html.escape(e.text.strip()) or '<em class="none">- unreadable -</em>'
     return (
         f'<tr><td class="tspan">{_ts(e.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{text}</td><td class="why">{html.escape(reason)}</td></tr>'
@@ -226,7 +226,7 @@ def _frame_html(png: bytes | None) -> str:
 
 def _thumb_html(png: bytes | None) -> str:
     if not png:
-        return '<span class="none">—</span>'
+        return '<span class="none">-</span>'
     uri = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
     return f'<img class="thumb-img" alt="subtitle frame" src="{uri}">'
 

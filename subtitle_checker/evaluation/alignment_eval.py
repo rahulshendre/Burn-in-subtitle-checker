@@ -1,7 +1,7 @@
 """Closed-loop evaluation of Stage 3 forced alignment on real audio.
 
 The structural eval can use synthetic regions because structural logic never
-looks at audio content. Alignment does — it scores words against real speech —
+looks at audio content. Alignment does - it scores words against real speech -
 so the truth has to come from a real clip: run Stage 1, keep the events whose
 OCR is confident enough to trust as a transcript, and each is a *correct* pair
 (its text matches the audio beneath it). Swap one word on a copy and you have a
@@ -9,7 +9,7 @@ OCR is confident enough to trust as a transcript, and each is a *correct* pair
 wrong; where the two distributions separate is the TEXT_MISMATCH threshold.
 
 The single-word swap is the hard case on purpose. Most of the line still
-matches, so the frame-weighted score dips only a little — if alignment
+matches, so the frame-weighted score dips only a little - if alignment
 separates that, the blunter multi-word errors fall out easily. Where it does
 not, that gap is exactly what the Sarvam ASR cross-check is there to cover.
 """
@@ -26,7 +26,7 @@ from subtitle_checker.match.align import ForcedAligner, score_event
 
 # An event's OCR must be at least this confident before its text is trusted as
 # ground truth. Garbled OCR (ornate clips) would otherwise pollute the correct
-# side and hide the signal — on Pushpa the junk lines score as randomly as
+# side and hide the signal - on Pushpa the junk lines score as randomly as
 # wrong text, so they must not count as "correct".
 MIN_OCR_CONF = 0.5
 # Fewer words than this and one swap changes most of the line (not the hard case
@@ -60,7 +60,7 @@ def _best_threshold(correct: list[float], swapped: list[float]) -> tuple[float, 
     """Cut that best separates correct (high) from swapped (low) scores.
 
     Returns (threshold, recall, precision) at the cut maximising balanced
-    accuracy — the point that best trades catching swaps against sparing
+    accuracy - the point that best trades catching swaps against sparing
     correct lines.
     """
     if not correct or not swapped:

@@ -76,7 +76,7 @@ def test_tiny_noise_is_not_text() -> None:
 
 
 def test_moving_sparkle_is_killed_by_stabilization() -> None:
-    # 200 px of bright "sequins" that shift every frame — enough pixels to
+    # 200 px of bright "sequins" that shift every frame - enough pixels to
     # pass the text minimum, but never stable across two frames
     masks = []
     for i in range(12):

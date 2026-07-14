@@ -1,6 +1,6 @@
 """End-to-end Stage 1 check: burn known subtitles, detect them back.
 
-Uses the evaluation harness's own burner to build the fixture — the harness
+Uses the evaluation harness's own burner to build the fixture - the harness
 grades the detector. ASCII text keeps the test independent of which fonts
 the CI runner has; Devanagari rendering is verified separately on real
 clips.

@@ -1,4 +1,4 @@
-"""Stage 4 — editor-facing report.
+"""Stage 4 - editor-facing report.
 
 Input: ``check_results`` artifact (plus frames/audio for evidence snippets).
 Output: an HTML report for non-technical QA reviewers.

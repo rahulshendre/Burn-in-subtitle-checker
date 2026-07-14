@@ -29,7 +29,7 @@ class SileroVad:
         self._model = None
 
     def speech_spans(self, audio: np.ndarray) -> list[tuple[float, float]]:
-        import torch  # pulls in the heavy stack — keep it off module import
+        import torch  # pulls in the heavy stack - keep it off module import
         from silero_vad import get_speech_timestamps, load_silero_vad
 
         if self._model is None:

@@ -19,7 +19,7 @@ class OcrEngine(Protocol):
 
 
 # EasyOCR returns one box per text region. Bright chrome that survives into a
-# crop — an animated channel logo, sequin sparkle — comes back as its own
+# crop - an animated channel logo, sequin sparkle - comes back as its own
 # boxes, and they read as punctuation, Latin, or digits (`"^7`, `१/ /`,
 # `177374`, `"डद"`). A real subtitle box is dominated by Devanagari letters, so
 # a per-box content test drops the junk without disturbing the actual line.
@@ -35,7 +35,7 @@ def _is_devanagari_line(text: str) -> bool:
 
     Requires at least two Devanagari letters (a stray glyph is not a line) and
     that Devanagari makes up most of the box (so a couple of letters wrapped in
-    quotes and slashes — a misread logo — does not pass).
+    quotes and slashes - a misread logo - does not pass).
     """
     chars = [c for c in text if not c.isspace()]
     if not chars:
@@ -59,7 +59,7 @@ class EasyOcrEngine:
 
     def read(self, band: np.ndarray) -> tuple[str, float]:
         if self._reader is None:
-            import easyocr  # pulls in torch — keep it off module import
+            import easyocr  # pulls in torch - keep it off module import
 
             self._reader = easyocr.Reader(self._langs, verbose=False)
         results = self._reader.readtext(band, detail=1, paragraph=False)
