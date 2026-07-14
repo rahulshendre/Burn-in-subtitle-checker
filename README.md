@@ -4,7 +4,7 @@ Flags moments where the spoken audio and the burned-in subtitles of a video do
 not match, so a reviewer can jump straight to the flagged spots instead of
 watching the whole file.
 
-Built for PlanetRead's Same Language Subtitling (SLS) content under C4GT DMP
+Built for PlanetRead and for content with Same Language Subtitling (SLS) content under C4GT DMP
 2026, issue [#3](https://github.com/PlanetRead/Burn-in-subtitle-checker/issues/3).
 
 ## The idea
