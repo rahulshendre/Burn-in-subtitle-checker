@@ -22,6 +22,10 @@ align = ["torchaudio>=2.1", "uroman>=1.2"]
 # ASR cross-check calls the Sarvam HTTP API - only requests; the key comes from
 # the SARVAM_API_KEY environment variable, never a dependency or a file
 asr = ["requests>=2.31"]
+# Optional cloud OCR: Sarvam Vision reads hard Devanagari bands more accurately
+# than EasyOCR. Its own extra so the on-device EasyOCR path never needs the SDK;
+# the key comes from SARVAM_API_KEY, never a dependency or a file
+vision = ["sarvamai>=0.1"]
 
 [project.scripts]
 subtitle-checker = "subtitle_checker.cli:main"

@@ -4,7 +4,11 @@ Cases are the real EasyOCR boxes from the Gatha clip (animated TATA PLAY logo
 bleeding into the crop) and their eyeballed truth.
 """
 
-from subtitle_checker.subtitles.ocr import _is_devanagari_line
+from subtitle_checker.subtitles.ocr import (
+    SARVAM_VISION_TRUSTED_CONF,
+    _is_devanagari_line,
+    _vision_text,
+)
 
 
 def test_keeps_real_subtitle_lines():
@@ -30,3 +34,16 @@ def test_drops_empty_and_single_glyph():
     assert not _is_devanagari_line("")
     assert not _is_devanagari_line("   ")
     assert not _is_devanagari_line("ढ")  # one stray letter is not a line
+
+
+def test_vision_text_joins_lines_and_drops_logo_blocks():
+    # Sarvam returns the subtitle and the leaked channel logo as separate blocks
+    text, conf = _vision_text(["और बुरा तो तब होगा।", "DD Free Dish"])
+    assert text == "और बुरा तो तब होगा।"  # logo block dropped
+    assert conf == SARVAM_VISION_TRUSTED_CONF
+
+
+def test_vision_text_empty_when_only_chrome():
+    text, conf = _vision_text(["TATA PL", "177374"])
+    assert text == ""
+    assert conf == 0.0

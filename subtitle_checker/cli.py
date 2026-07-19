@@ -31,6 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also run the Sarvam ASR cross-check for word-level errors (needs SARVAM_API_KEY)",
     )
+    check.add_argument(
+        "--ocr",
+        choices=["easyocr", "sarvam-vision"],
+        default="easyocr",
+        help="OCR engine: easyocr (on-device default) or sarvam-vision "
+        "(cloud quality engine, needs SARVAM_API_KEY)",
+    )
 
     rep = subparsers.add_parser(
         "report", help="Render a saved check into a self-contained HTML report"
@@ -118,6 +125,17 @@ def _run_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_ocr(name: str, lang: str):
+    """Build the OCR engine named on the command line."""
+    if name == "sarvam-vision":
+        from subtitle_checker.subtitles.ocr import SarvamVisionOcr
+
+        return SarvamVisionOcr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+    from subtitle_checker.subtitles.ocr import EasyOcrEngine
+
+    return EasyOcrEngine([lang])
+
+
 def _run_check(args: argparse.Namespace) -> int:
     video = Path(args.video)
     if not video.exists():
@@ -125,13 +143,12 @@ def _run_check(args: argparse.Namespace) -> int:
         return 2
 
     from subtitle_checker.artifacts import save_artifact
-    from subtitle_checker.subtitles.ocr import EasyOcrEngine
     from subtitle_checker.subtitles.reconstruct import reconstruct_subtitles
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    events = reconstruct_subtitles(video, engine=EasyOcrEngine([args.lang]))
+    events = reconstruct_subtitles(video, engine=_build_ocr(args.ocr, args.lang))
     artifact = out_dir / f"{video.stem}_subtitle_events.json"
     save_artifact(artifact, "subtitle_events", events)
 
