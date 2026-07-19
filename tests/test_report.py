@@ -7,7 +7,7 @@ is opaque bytes here; the ffmpeg-backed extractor is tested separately.
 from __future__ import annotations
 
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
-from subtitle_checker.report.html import render_report
+from subtitle_checker.report.html import _diff_texts, _grapheme_clusters, render_report
 
 
 class FakeEvidence:
@@ -123,3 +123,32 @@ def test_skipped_lines_render_with_reason():
 def test_no_skipped_section_when_none_given():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
     assert "Skipped lines" not in out
+
+
+def test_grapheme_clusters_keep_matra_with_base():
+    # each akshara is one unit: र + ी is a single cluster, not two codepoints
+    assert _grapheme_clusters("हमारी") == ["ह", "मा", "री"]
+
+
+def test_matra_diff_marks_only_the_changed_akshara():
+    written_html, heard_html = _diff_texts("हमारि", "हमारी")
+    assert '<mark class="diff">रि</mark>' in written_html
+    assert '<mark class="diff">री</mark>' in heard_html
+    # the shared aksharas are left unmarked
+    assert written_html.startswith("हमा")
+
+
+def test_identical_texts_are_not_marked():
+    written_html, heard_html = _diff_texts("कैसे मिला", "कैसे मिला")
+    assert "mark" not in written_html and "mark" not in heard_html
+
+
+def test_ledger_highlights_a_matra_difference():
+    results = [
+        CheckResult(
+            0.0, 2.0, Verdict.OK, "matches",
+            subtitle_text="हमारि वजह से", heard_text="हमारी वजह से",
+        )
+    ]
+    out = render_report(results, FakeEvidence(), title="Demo")
+    assert 'mark class="diff"' in out

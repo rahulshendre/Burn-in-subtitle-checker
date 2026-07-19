@@ -18,7 +18,9 @@ report.evidence, and tests pass a fake.
 from __future__ import annotations
 
 import base64
+import difflib
 import html
+import unicodedata
 from datetime import datetime
 from typing import Protocol
 
@@ -144,8 +146,10 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
     score = (
         f'<span class="score">match {r.score:.0%}</span>' if r.score is not None else ""
     )
-    written = html.escape(r.subtitle_text.strip()) or '<em class="none">- no subtitle -</em>'
-    heard = html.escape(r.heard_text.strip()) or '<em class="none">- not transcribed -</em>'
+    written, heard = _written_heard(
+        r, no_subtitle='<em class="none">- no subtitle -</em>',
+        not_heard='<em class="none">- not transcribed -</em>',
+    )
     return (
         f'<article class="card" style="border-left:6px solid {color}">'
         f'<div class="card-head">'
@@ -182,8 +186,7 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
-    written = html.escape(r.subtitle_text.strip()) or "-"
-    heard = html.escape(r.heard_text.strip()) or '<em class="none">-</em>'
+    written, heard = _written_heard(r, no_subtitle="-", not_heard='<em class="none">-</em>')
     return (
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
@@ -215,6 +218,72 @@ def _skipped_row(e: SubtitleEvent, reason: str, evidence: Evidence) -> str:
         f'<tr><td class="tspan">{_ts(e.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{text}</td><td class="why">{html.escape(reason)}</td></tr>'
     )
+
+
+def _written_heard(r: CheckResult, *, no_subtitle: str, not_heard: str) -> tuple[str, str]:
+    """The written and heard cells for a result, diff-marked when both exist.
+
+    When a line has both a subtitle and a transcript, the differing clusters are
+    highlighted so a matra or word difference jumps out (this is where the editor
+    catches the subtle errors the tool does not auto-flag). When one side is
+    absent - a missing or orphan line - there is nothing to diff, so a plain
+    placeholder stands in.
+    """
+    written, heard = r.subtitle_text.strip(), r.heard_text.strip()
+    if written and heard:
+        return _diff_texts(written, heard)
+    return html.escape(written) or no_subtitle, html.escape(heard) or not_heard
+
+
+def _diff_texts(written: str, heard: str) -> tuple[str, str]:
+    """Escaped HTML for both texts with the differing clusters marked.
+
+    Diffing is over grapheme clusters, not codepoints: a matra (vowel sign) is a
+    combining mark, so हमारी vs हमारि differs in one cluster (री vs रि), and
+    marking the whole akshara is what shows an editor the exact wrong vowel. A
+    codepoint diff would highlight a bare, meaningless combining mark instead.
+    """
+    w = _grapheme_clusters(written)
+    h = _grapheme_clusters(heard)
+    matcher = difflib.SequenceMatcher(a=w, b=h, autojunk=False)
+    written_out: list[str] = []
+    heard_out: list[str] = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        changed = tag != "equal"
+        written_out.append(_mark("".join(w[i1:i2]), changed))
+        heard_out.append(_mark("".join(h[j1:j2]), changed))
+    return "".join(written_out), "".join(heard_out)
+
+
+def _mark(text: str, changed: bool) -> str:
+    if not text:
+        return ""
+    escaped = html.escape(text)
+    return f'<mark class="diff">{escaped}</mark>' if changed else escaped
+
+
+def _grapheme_clusters(text: str) -> list[str]:
+    """Split Devanagari text into user-perceived characters (aksharas).
+
+    A base letter carries its following combining marks (matras, nukta,
+    anusvara), and a virama binds the next consonant into the same conjunct
+    cluster, so each element is one akshara the reader sees as a unit.
+    """
+    clusters: list[str] = []
+    for ch in text:
+        if clusters and _binds_to_previous(clusters[-1], ch):
+            clusters[-1] += ch
+        else:
+            clusters.append(ch)
+    return clusters
+
+
+def _binds_to_previous(previous: str, ch: str) -> bool:
+    if unicodedata.category(ch) in ("Mn", "Mc", "Me"):
+        return True  # a combining mark joins the base it follows
+    if ch in ("‍", "‌"):
+        return True  # ZWJ / ZWNJ hold a conjunct together
+    return previous.endswith("्")  # a virama pulls the next consonant in
 
 
 def _frame_html(png: bytes | None) -> str:
@@ -288,6 +357,7 @@ _STYLE = """<style>
   .col h4 { margin:0 0 .2rem; font-size:.75rem; text-transform:uppercase;
             letter-spacing:.04em; color:#888; }
   .deva { margin:0; font-size:1.05rem; }
+  mark.diff { background:#ffe08a; color:inherit; border-radius:2px; padding:0 .05em; }
   .none { color:#aaa; }
   .reason { color:#555; font-size:.9rem; margin:.7rem 0 .5rem; }
   audio { width:100%; max-width:340px; height:34px; margin-top:.3rem; }
