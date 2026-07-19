@@ -13,11 +13,14 @@ heavy background score, carries poor OCR, or is too short to align reliably. A
 subtitle over *music* is still Stage 2's UNCHECKABLE; alignment does not add
 per-line noise of its own.
 
-It does emit one positive verdict. When OCR confidence is too low for the
-mismatch test but the words align strongly regardless, the line is VERIFIED (OK)
-instead of dropped: a wrong or absent line cannot align that well, so a high
-score is standalone proof the text was spoken, and abstaining on it only throws
-away coverage the OCR-confidence gate never earned (see evaluation.coverage).
+It also verifies. Any line whose words align strongly - score at or above
+ALIGN_VERIFY_MIN - is VERIFIED (OK), regardless of OCR confidence: a wrong or
+absent line cannot align that well, so a high score is standalone proof the
+text was spoken. This matters most for a trusted cloud OCR (Sarvam Vision)
+whose own confidence does not track legibility: alignment credits its clean
+reads locally, without waiting on the ASR cross-check (see evaluation.coverage).
+When the ASR ledger also runs, its heard-vs-written OK supersedes this bare OK
+for the same line in the merge, and its TEXT_MISMATCH overrides it.
 """
 
 from __future__ import annotations
@@ -40,10 +43,10 @@ MIN_OCR_CONF = 0.5
 # score low even when correct - on Mann two ~0.6 s lines with clean OCR dropped
 # under the cut. Only lines at least this long can trip TEXT_MISMATCH.
 MIN_MISMATCH_SPAN = 1.5
-# A line the OCR-confidence gate would drop is VERIFIED instead when it aligns at
-# least this well: a score this high is standalone proof the words were spoken
-# (a wrong line cannot reach it), so the read is confirmed rather than abstained.
-# Set at the floor of the confidently-correct band - real correct lines measure
+# A line that aligns at least this well is VERIFIED (OK): a score this high is
+# standalone proof the words were spoken (a wrong line cannot reach it), so the
+# read is confirmed rather than abstained - whatever its OCR confidence. Set at
+# the floor of the confidently-correct band: real correct lines measure
 # ~0.6-0.75; a music-heavy clip's borderline reads sit lower and stay abstained,
 # which is honest. Positive verification only: it never turns into a flag.
 ALIGN_VERIFY_MIN = 0.55
@@ -59,9 +62,10 @@ def check_alignment(
 ) -> list[CheckResult]:
     """Judge speech-covered events by how their text aligns to the audio.
 
-    A confident low score flags TEXT_MISMATCH. A confident high score on a line
-    the OCR-confidence gate would otherwise drop VERIFIES it (OK). Everything in
-    between abstains.
+    A trusted, long-enough line with a low score flags TEXT_MISMATCH. Any line
+    with a high score VERIFIES (OK), whatever its OCR confidence. Scores in
+    between - and low scores on garbled or too-short lines - abstain, since a
+    low score there is not evidence of a real mismatch.
     """
     results: list[CheckResult] = []
     for s in scores:
@@ -70,26 +74,11 @@ def check_alignment(
             continue  # no speech beneath it - structural's call (ORPHAN / UNCHECKABLE)
         if s.score is None:
             continue  # unalignable - UNCHECKABLE elsewhere, never a mismatch
-        if s.ocr_confidence < min_ocr_conf:
-            # Garbled OCR scores as low as a real mismatch, so a low score here is
-            # not evidence - never accuse. But a high score is independent proof
-            # the words were spoken, so verify the line despite weak OCR
-            # confidence (recovering coverage the conf gate would discard).
-            if s.score >= align_verify_min:
-                results.append(
-                    CheckResult(
-                        start=s.start,
-                        end=s.end,
-                        verdict=Verdict.OK,
-                        reason="the subtitle text aligns to the speech beneath it",
-                        subtitle_text=s.text,
-                        score=s.score,
-                    )
-                )
-            continue
-        if s.end - s.start < min_span:
-            continue  # too short to align reliably - abstain, never accuse
-        if s.score < text_mismatch_max:
+        # Flag only when a low score is real evidence: trusted OCR (garbled text
+        # scores low even when spoken) and a long-enough line (short lines align
+        # unreliably low). Otherwise a high score still verifies the read.
+        can_flag = s.ocr_confidence >= min_ocr_conf and s.end - s.start >= min_span
+        if can_flag and s.score < text_mismatch_max:
             results.append(
                 CheckResult(
                     start=s.start,
@@ -100,5 +89,16 @@ def check_alignment(
                     score=s.score,
                 )
             )
-        # else: text matches the speech - left unflagged (ASR ledger owns OK here)
+        elif s.score >= align_verify_min:
+            results.append(
+                CheckResult(
+                    start=s.start,
+                    end=s.end,
+                    verdict=Verdict.OK,
+                    reason="the subtitle text aligns to the speech beneath it",
+                    subtitle_text=s.text,
+                    score=s.score,
+                )
+            )
+        # else: mid score, or a low score with no grounds to flag - abstain
     return results

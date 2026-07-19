@@ -22,8 +22,12 @@ def test_low_score_over_speech_is_text_mismatch() -> None:
     assert results[0].score == 0.1
 
 
-def test_good_score_over_speech_is_unflagged() -> None:
-    assert check_alignment([_score(0.7)], SPEECH) == []
+def test_good_score_over_speech_is_verified() -> None:
+    # a strong alignment verifies the line (OK), whatever the OCR confidence
+    results = check_alignment([_score(0.7)], SPEECH)
+    assert len(results) == 1
+    assert results[0].verdict is Verdict.OK
+    assert results[0].score == 0.7
 
 
 def test_event_without_speech_is_left_to_structural() -> None:
@@ -71,6 +75,14 @@ def test_rescue_does_not_require_min_span() -> None:
     assert results[0].verdict is Verdict.OK
 
 
-def test_trusted_line_is_not_double_verified() -> None:
-    # a good score with trustworthy OCR stays silent - the ASR ledger owns its OK
-    assert check_alignment([_score(0.6, ocr_confidence=0.9)], SPEECH) == []
+def test_trusted_line_high_alignment_is_verified() -> None:
+    # a good score with trustworthy OCR is now verified locally (the merge dedups
+    # it against the ASR ledger's OK, so it is not double-counted downstream)
+    results = check_alignment([_score(0.6, ocr_confidence=0.9)], SPEECH)
+    assert len(results) == 1
+    assert results[0].verdict is Verdict.OK
+
+
+def test_trusted_mid_score_still_abstains() -> None:
+    # between the mismatch cut and the verify floor: not flag, not proof - abstain
+    assert check_alignment([_score(0.45, ocr_confidence=0.9)], SPEECH) == []
