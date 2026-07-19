@@ -7,7 +7,12 @@ from pathlib import Path
 
 from subtitle_checker.artifacts import SubtitleEvent, save_artifact
 from subtitle_checker.evaluation.burn import DEFAULT_FONT, burn_subtitles
-from subtitle_checker.evaluation.defects import MAX_SHIFT_S, plan_defects, save_defects
+from subtitle_checker.evaluation.defects import (
+    MAX_SHIFT_S,
+    DefectType,
+    plan_defects,
+    save_defects,
+)
 
 
 def _video_duration(video: Path) -> float:
@@ -35,10 +40,13 @@ def make_test_video(
     out_dir: Path,
     seed: int = 0,
     font: str = DEFAULT_FONT,
+    types: list[DefectType] | None = None,
 ) -> tuple[Path, Path]:
     """Burn a defective subtitle track onto ``video``; return (video, labels) paths.
 
     ``truth_events`` must be the verified-correct subtitles for the clip.
+    ``types`` selects which defects to plant (default: the auto-catchable
+    sweep); pass ``[DefectType.MATRA_SWAP]`` to produce a subtle-error clip.
     Three sibling files land in ``out_dir`` (suffixed with the seed): the
     defective video, the defect labels the scorer reads, and the mutated
     subtitle track that was burned (for debugging the burn itself).
@@ -57,7 +65,7 @@ def make_test_video(
             f"events must stop at least {MAX_SHIFT_S}s before the end"
         )
 
-    mutated, defects = plan_defects(truth_events, seed=seed)
+    mutated, defects = plan_defects(truth_events, seed=seed, types=types)
     out_video = burn_subtitles(video, mutated, out_dir / f"{stem}_defective_seed{seed}.mp4", font)
 
     labels_path = out_dir / f"{stem}_defects_seed{seed}.json"
