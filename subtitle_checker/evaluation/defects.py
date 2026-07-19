@@ -23,6 +23,7 @@ class DefectType(str, Enum):
     TIMING_SHIFT = "timing_shift"
     DROP_LINE = "drop_line"
     EXTRA_LINE = "extra_line"
+    MATRA_SWAP = "matra_swap"
 
 
 EXPECTED_VERDICT = {
@@ -30,7 +31,23 @@ EXPECTED_VERDICT = {
     DefectType.TIMING_SHIFT: Verdict.TIMING_DRIFT,
     DefectType.DROP_LINE: Verdict.MISSING_SUBTITLE,
     DefectType.EXTRA_LINE: Verdict.ORPHAN_SUBTITLE,
+    # A single wrong vowel sign sits below the OCR<->ASR noise floor: the audio
+    # says the right word, so ASR matches the subtitle and the line passes as OK.
+    # The tool does not auto-flag it - it SURFACES the heard-vs-written diff for
+    # the editor (report/html.py highlights the differing cluster). So OK is the
+    # honest expectation, and matra_swap is an opt-in generator, not a default
+    # sweep defect - it exists to produce error clips and to demo the surfacing.
+    DefectType.MATRA_SWAP: Verdict.OK,
 }
+
+# The auto-catchable defects planted by default. MATRA_SWAP is deliberately out:
+# it is not meant to be caught, only surfaced, so it is requested explicitly.
+DEFAULT_TYPES = (
+    DefectType.WORD_SWAP,
+    DefectType.TIMING_SHIFT,
+    DefectType.DROP_LINE,
+    DefectType.EXTRA_LINE,
+)
 
 # A shifted line must move far enough that the drift is unambiguous.
 MIN_SHIFT_S = 0.8
@@ -78,7 +95,7 @@ def plan_defects(
     if len(events) < 4:
         raise ValueError("need at least 4 subtitle events to plant all defect types")
 
-    requested = list(types) if types is not None else list(DefectType)
+    requested = list(types) if types is not None else list(DEFAULT_TYPES)
     single = [t for t in _SINGLE_LINE_TYPES if t in requested]
 
     rng = random.Random(seed)
@@ -88,6 +105,9 @@ def plan_defects(
     defects: list[Defect] = []
     if DefectType.WORD_SWAP in requested:
         defects.append(_swap_word(rng, mutated, victim[DefectType.WORD_SWAP]))
+    if DefectType.MATRA_SWAP in requested:
+        # picks its own victim line (one carrying a matra), never a classic victim
+        defects.append(_swap_matra(rng, mutated, exclude=set(victim.values())))
     if DefectType.TIMING_SHIFT in requested:
         defects.append(_shift_timing(rng, mutated, victim[DefectType.TIMING_SHIFT]))
 
@@ -143,6 +163,53 @@ def _swap_word(rng: random.Random, events: list[SubtitleEvent], index: int) -> D
         end=victim.end,
         original_text=victim.text,
         mutated_text=swapped,
+    )
+
+
+# Each dependent vowel sign maps to its nearest visual/phonetic neighbour, so a
+# swap is a believable single-matra typo (short<->long i/u, e<->ai, o<->au) - the
+# subtle class Abinash wants tested, not a gross wrong word.
+_MATRA_ALT = {
+    "ि": "ी",  # ि -> ी
+    "ी": "ि",  # ी -> ि
+    "ु": "ू",  # ु -> ू
+    "ू": "ु",  # ू -> ु
+    "े": "ै",  # े -> ै
+    "ै": "े",  # ै -> े
+    "ो": "ौ",  # ो -> ौ
+    "ौ": "ो",  # ौ -> ो
+}
+
+
+def _swap_matra(rng: random.Random, events: list[SubtitleEvent], exclude: set[int]) -> Defect:
+    """Change one vowel sign on one line - a subtle, below-noise-floor error.
+
+    Picks a line carrying a swappable matra (avoiding lines already claimed by
+    other defects) and flips one matra to its neighbour. The result is a real
+    word misspelt by a single diacritic, the error class the tool surfaces for
+    the editor rather than auto-flags.
+    """
+    candidates = sorted(
+        i
+        for i in range(len(events))
+        if i not in exclude and any(c in _MATRA_ALT for c in events[i].text)
+    )
+    if not candidates:
+        raise ValueError("no subtitle line carries a swappable matra")
+    index = rng.choice(candidates)
+    victim = events[index]
+    chars = list(victim.text)
+    positions = [j for j, c in enumerate(chars) if c in _MATRA_ALT]
+    pos = rng.choice(positions)
+    chars[pos] = _MATRA_ALT[chars[pos]]
+    mutated_text = "".join(chars)
+    events[index] = SubtitleEvent(victim.start, victim.end, mutated_text, victim.confidence)
+    return Defect(
+        type=DefectType.MATRA_SWAP,
+        start=victim.start,
+        end=victim.end,
+        original_text=victim.text,
+        mutated_text=mutated_text,
     )
 
 

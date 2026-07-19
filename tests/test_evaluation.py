@@ -7,8 +7,11 @@ import pytest
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
 from subtitle_checker.evaluation.burn import _ass_timestamp, events_to_ass
 from subtitle_checker.evaluation.defects import (
+    DEFAULT_TYPES,
+    EXPECTED_VERDICT,
     MIN_GAP_S,
     MIN_SHIFT_S,
+    _MATRA_ALT,
     Defect,
     DefectType,
     load_defects,
@@ -50,7 +53,7 @@ class TestPlanDefects:
     def test_one_defect_of_each_type_and_event_count_balances(self) -> None:
         truth = make_truth()
         mutated, defects = plan_defects(truth, seed=1)
-        assert sorted(d.type.value for d in defects) == sorted(t.value for t in DefectType)
+        assert sorted(d.type.value for d in defects) == sorted(t.value for t in DEFAULT_TYPES)
         # one line dropped, one line added
         assert len(mutated) == len(truth)
 
@@ -118,8 +121,28 @@ class TestPlanDefects:
     def test_full_set_matches_untyped_default(self) -> None:
         truth = make_truth()
         assert plan_defects(truth, seed=5) == plan_defects(
-            truth, seed=5, types=list(DefectType)
+            truth, seed=5, types=list(DEFAULT_TYPES)
         )
+
+    def test_matra_swap_is_opt_in_only(self) -> None:
+        # not planted by default - it is surfaced, not caught, so it is explicit
+        _, defects = plan_defects(make_truth(), seed=1)
+        assert not any(d.type is DefectType.MATRA_SWAP for d in defects)
+
+    def test_matra_swap_changes_exactly_one_vowel_sign(self) -> None:
+        _, defects = plan_defects(make_truth(), seed=1, types=[DefectType.MATRA_SWAP])
+        matra = defect_of(defects, DefectType.MATRA_SWAP)
+        before, after = matra.original_text, matra.mutated_text
+        assert len(before) == len(after)
+        diffs = [(a, b) for a, b in zip(before, after) if a != b]
+        assert len(diffs) == 1  # exactly one character changed
+        original_sign, new_sign = diffs[0]
+        # and the change is a matra-to-neighbour swap, not a random edit
+        assert _MATRA_ALT[original_sign] == new_sign
+
+    def test_matra_swap_expected_verdict_is_ok(self) -> None:
+        # honest: a single wrong matra is below the auto-flag noise floor
+        assert EXPECTED_VERDICT[DefectType.MATRA_SWAP] is Verdict.OK
 
     def test_too_few_events_rejected(self) -> None:
         with pytest.raises(ValueError, match="at least 4"):
