@@ -58,12 +58,16 @@ def test_merge_keeps_structural_flag_and_adds_ok_ledger() -> None:
     assert spans == {(5.0, 7.0), (1.0, 3.0)}
 
 
-def test_merge_alignment_flag_survives_when_asr_says_ok() -> None:
+def test_merge_asr_ok_clears_stale_alignment_mismatch() -> None:
+    # Alignment can mis-score a correct line (a clipped detection span or heavy
+    # background score drags the score below the flag cut). A confident ASR OK
+    # heard the words match, so it is the authority and clears the false flag.
     align = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "alignment", subtitle_text="X")
     ok = CheckResult(1.0, 3.0, Verdict.OK, "ok", "X", "X")
     merged = _merge_results([align], [ok])
     assert len(merged) == 1
-    assert merged[0].verdict is Verdict.TEXT_MISMATCH  # flag wins, OK row deduped out
+    assert merged[0].verdict is Verdict.OK  # ASR heard it match; alignment flag cleared
+    assert merged[0].heard_text == "X"
 
 
 def test_report_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:

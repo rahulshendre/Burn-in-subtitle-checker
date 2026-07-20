@@ -281,17 +281,18 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
 def _merge_results(flags: list, ledger: list) -> list:
     """Combine flags with the ASR ledger into the saved check_results.
 
-    An ASR row carries heard-vs-written evidence a bare alignment flag lacks, so
-    an ASR TEXT_MISMATCH supersedes an alignment flag on the same line. Otherwise
-    the remaining flags win their span, and the leftover ledger rows (the OK
-    heard-vs-written scan) fill in the lines nothing flagged.
+    The ASR ledger is the word-level authority for any line it transcribed: it
+    heard the audio and carries heard-vs-written evidence, so its verdict wins
+    over an alignment flag on the same span. An ASR OK clears a stale alignment
+    mismatch - alignment mis-scores a correct line under a heavy background score
+    or a clipped detection span, and if the words were truly absent the ASR could
+    not have heard them match - and an ASR TEXT_MISMATCH replaces the bare flag
+    with the evidence. Structural flags (MISSING / ORPHAN / UNCHECKABLE) sit on
+    gap spans the ledger never covers, so they are left untouched.
     """
-    from subtitle_checker.artifacts import Verdict
-
-    asr_mismatch = {(r.start, r.end) for r in ledger if r.verdict is Verdict.TEXT_MISMATCH}
-    flags = [f for f in flags if (f.start, f.end) not in asr_mismatch]
-    kept = {(f.start, f.end) for f in flags}
-    return flags + [r for r in ledger if (r.start, r.end) not in kept]
+    ledger_spans = {(r.start, r.end) for r in ledger}
+    flags = [f for f in flags if (f.start, f.end) not in ledger_spans]
+    return flags + ledger
 
 
 def _print_flags(results: list) -> None:
