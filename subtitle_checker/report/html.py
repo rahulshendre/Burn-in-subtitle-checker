@@ -143,9 +143,7 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
-    score = (
-        f'<span class="score">match {r.score:.0%}</span>' if r.score is not None else ""
-    )
+    score = _score_html(r)
     written, heard = _written_heard(
         r, no_subtitle='<em class="none">- no subtitle -</em>',
         not_heard='<em class="none">- not transcribed -</em>',
@@ -167,6 +165,33 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
     )
 
 
+def _score_breakdown(r: CheckResult) -> list[str]:
+    """The OCR and audio confidences that fold into the combined score."""
+    bits = []
+    if r.ocr_confidence is not None:
+        bits.append(f"OCR {r.ocr_confidence:.0%}")
+    if r.score is not None:
+        bits.append(f"audio {r.score:.0%}")
+    return bits
+
+
+def _score_html(r: CheckResult) -> str:
+    """Card-head score: the one combined confidence with its OCR + audio parts."""
+    if r.combined_score is None:
+        return ""
+    bits = _score_breakdown(r)
+    detail = f' <small>{" &middot; ".join(bits)}</small>' if bits else ""
+    return f'<span class="score">score {r.combined_score:.0f}{detail}</span>'
+
+
+def _score_cell(r: CheckResult) -> str:
+    """Ledger score column: the combined number, breakdown on hover."""
+    if r.combined_score is None:
+        return '<td class="score-cell">-</td>'
+    tip = html.escape(" · ".join(_score_breakdown(r)))
+    return f'<td class="score-cell" title="{tip}">{r.combined_score:.0f}</td>'
+
+
 def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
     if not oks:
         return ""
@@ -176,7 +201,7 @@ def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
         '<table><thead><tr><th>Time</th><th>Frame</th><th>Written</th>'
-        "<th>Heard (ASR)</th><th>Audio</th></tr></thead><tbody>"
+        "<th>Heard (ASR)</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
 
@@ -190,7 +215,7 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     return (
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
-        f"<td>{audio}</td></tr>"
+        f"{_score_cell(r)}<td>{audio}</td></tr>"
     )
 
 
@@ -346,7 +371,10 @@ _STYLE = """<style>
   .badge { color:#fff; border-radius:4px; padding:.15rem .5rem; font-size:.8rem;
            font-weight:600; }
   .tspan { font-variant-numeric:tabular-nums; color:#555; font-size:.9rem; }
-  .score { margin-left:auto; color:#555; font-size:.85rem; }
+  .score { margin-left:auto; color:#333; font-size:.9rem; font-weight:600; }
+  .score small { color:#888; font-weight:normal; font-size:.8rem; }
+  .score-cell { text-align:center; font-weight:600; font-variant-numeric:tabular-nums;
+                cursor:help; }
   .card-body { display:flex; gap:1rem; padding:.8rem; flex-wrap:wrap; }
   .frame img { width:320px; max-width:100%; border-radius:4px; display:block; }
   .noframe { width:320px; height:120px; background:#f0f0f0; color:#aaa;

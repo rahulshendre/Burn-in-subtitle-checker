@@ -46,6 +46,8 @@ def _sample() -> list[CheckResult]:
             subtitle_text="हम सब से नज़रे",
             heard_text="हम सब की नज़र",
             score=0.21,
+            ocr_confidence=0.8,
+            combined_score=38.7,
         ),
         CheckResult(
             start=9.0,
@@ -54,6 +56,9 @@ def _sample() -> list[CheckResult]:
             reason="matches",
             subtitle_text="कैसे मिला पायेंगे",
             heard_text="कैसे मिला पायेंगे",
+            score=0.95,
+            ocr_confidence=0.6,
+            combined_score=84.5,
         ),
     ]
 
@@ -84,9 +89,17 @@ def test_ok_rows_go_to_ledger_table():
     assert "कैसे मिला पायेंगे" in out
 
 
-def test_score_shown_as_percent():
+def test_combined_score_shown_on_card():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "match 21%" in out
+    # the fused score headlines the card, with the OCR + audio breakdown beside it
+    assert "score 39" in out
+    assert "OCR 80%" in out and "audio 21%" in out
+
+
+def test_ledger_has_score_column():
+    out = render_report(_sample(), FakeEvidence(), title="Demo")
+    assert "<th>Score</th>" in out
+    assert ">84<" in out  # the OK line's combined score, rounded for the cell
 
 
 def test_missing_subtitle_placeholder_when_no_text():
