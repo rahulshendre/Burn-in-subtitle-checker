@@ -25,6 +25,7 @@ import numpy as np
 from rapidfuzz.fuzz import token_set_ratio
 
 from subtitle_checker.artifacts import AudioRegion, CheckResult, SubtitleEvent, Verdict
+from subtitle_checker.match.scoring import combined_score
 from subtitle_checker.match.structural import event_has_speech
 
 SAMPLE_RATE = 16_000
@@ -158,6 +159,7 @@ def transcribe_lines(
             continue
         heard, ratio = heard_ratio
         mismatch = ratio < min_ratio
+        match = ratio / 100.0
         results.append(
             CheckResult(
                 start=event.start,
@@ -170,7 +172,9 @@ def transcribe_lines(
                 ),
                 subtitle_text=event.text,
                 heard_text=heard,
-                score=ratio / 100.0,
+                score=match,
+                ocr_confidence=event.confidence,
+                combined_score=combined_score(event.confidence, match),
             )
         )
     return results

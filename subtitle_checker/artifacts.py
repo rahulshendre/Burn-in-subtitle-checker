@@ -69,7 +69,9 @@ class CheckResult:
     reason: str
     subtitle_text: str = ""
     heard_text: str = ""
-    score: float | None = None
+    score: float | None = None  # audio-vs-text agreement 0..1 (ASR ratio / align)
+    ocr_confidence: float | None = None  # Stage-1 read reliability 0..1
+    combined_score: float | None = None  # fused OCR + audio confidence, 0-100
 
     def __post_init__(self) -> None:
         self.verdict = Verdict(self.verdict)

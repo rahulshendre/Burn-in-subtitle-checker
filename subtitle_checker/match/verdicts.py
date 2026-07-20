@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from subtitle_checker.artifacts import AudioRegion, CheckResult, SubtitleEvent, Verdict
 from subtitle_checker.match.align import AlignmentScore
+from subtitle_checker.match.scoring import combined_score
 from subtitle_checker.match.structural import event_has_speech
 
 # Below this alignment score the words are treated as not spoken here. Set well
@@ -87,6 +88,8 @@ def check_alignment(
                     reason="subtitle text does not match the speech beneath it",
                     subtitle_text=s.text,
                     score=s.score,
+                    ocr_confidence=s.ocr_confidence,
+                    combined_score=combined_score(s.ocr_confidence, s.score),
                 )
             )
         elif s.score >= align_verify_min:
@@ -98,6 +101,8 @@ def check_alignment(
                     reason="the subtitle text aligns to the speech beneath it",
                     subtitle_text=s.text,
                     score=s.score,
+                    ocr_confidence=s.ocr_confidence,
+                    combined_score=combined_score(s.ocr_confidence, s.score),
                 )
             )
         # else: mid score, or a low score with no grounds to flag - abstain
