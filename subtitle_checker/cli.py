@@ -239,9 +239,24 @@ def _run_report(args: argparse.Namespace) -> int:
 
     out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
     skipped = _load_skipped(results_path, video, results)
-    write_report(video, results, out, title=f"Subtitle check - {video.stem}", skipped=skipped)
+    legibility = _load_legibility(results_path, video)
+    write_report(
+        video, results, out,
+        title=f"Subtitle check - {video.stem}", skipped=skipped, legibility=legibility,
+    )
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
+
+
+def _load_legibility(results_path: Path, video: Path) -> object | None:
+    """Grade legibility from the sibling events artifact when it exists."""
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.subtitles.legibility import video_legibility
+
+    events_path = results_path.parent / f"{video.stem}_subtitle_events.json"
+    if not events_path.exists():
+        return None
+    return video_legibility(load_artifact(events_path)[1])
 
 
 def _load_skipped(results_path: Path, video: Path, results: list) -> list | None:
@@ -298,9 +313,14 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
     from subtitle_checker.match.asr import skipped_lines
+    from subtitle_checker.subtitles.legibility import video_legibility
 
     _print_flags(results)
-    _write_report(video, results, out_dir, skipped_lines(events, results, regions))
+    _write_report(
+        video, results, out_dir,
+        skipped=skipped_lines(events, results, regions),
+        legibility=video_legibility(events),
+    )
 
 
 def _alignment_flags(events: list, audio, regions: list, lang: str) -> list:
@@ -363,11 +383,20 @@ def _print_flags(results: list) -> None:
         print(f"  {f.verdict.value:17} {f.start:7.2f}-{f.end:7.2f}  {text}")
 
 
-def _write_report(video: Path, results: list, out_dir: Path, skipped: list | None = None) -> None:
+def _write_report(
+    video: Path,
+    results: list,
+    out_dir: Path,
+    skipped: list | None = None,
+    legibility: object | None = None,
+) -> None:
     from subtitle_checker.report.evidence import write_report
 
     path = out_dir / f"{video.stem}_report.html"
-    write_report(video, results, path, title=f"Subtitle check - {video.stem}", skipped=skipped)
+    write_report(
+        video, results, path,
+        title=f"Subtitle check - {video.stem}", skipped=skipped, legibility=legibility,
+    )
     print(f"report -> {path}")
 
 

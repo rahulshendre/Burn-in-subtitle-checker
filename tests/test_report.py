@@ -156,6 +156,39 @@ def test_identical_texts_are_not_marked():
     assert "mark" not in written_html and "mark" not in heard_html
 
 
+def _legibility(score: float, worst):
+    from subtitle_checker.subtitles.legibility import LineLegibility, VideoLegibility
+
+    lines = [LineLegibility(s, e, txt, c, sc) for s, e, txt, c, sc in worst]
+    return VideoLegibility(score=score, line_count=len(lines), worst=lines)
+
+
+def test_legibility_banner_shows_grade_and_headline():
+    leg = _legibility(89.0, [(1.0, 2.0, "बुरा तो तब होगा", 0.45, 60.0)])
+    out = render_report(_sample(), FakeEvidence(), title="Demo", legibility=leg)
+    assert "Subtitle legibility" in out
+    assert "89<small>/100</small>" in out
+    assert "read easily" in out  # the clear-band headline
+
+
+def test_legibility_section_lists_low_lines():
+    leg = _legibility(70.0, [(1.0, 2.0, "बुरा तो तब होगा", 0.45, 60.0)])
+    out = render_report(_sample(), FakeEvidence(), title="Demo", legibility=leg)
+    assert "Least legible lines" in out
+    assert "बुरा तो तब होगा" in out
+
+
+def test_no_least_legible_section_when_all_lines_are_clear():
+    leg = _legibility(100.0, [(1.0, 2.0, "साफ़ पंक्ति", 0.9, 100.0)])
+    out = render_report(_sample(), FakeEvidence(), title="Demo", legibility=leg)
+    assert "Least legible lines" not in out
+
+
+def test_no_legibility_block_without_a_grade():
+    out = render_report(_sample(), FakeEvidence(), title="Demo")
+    assert "Subtitle legibility" not in out
+
+
 def test_ledger_highlights_a_matra_difference():
     results = [
         CheckResult(

@@ -22,9 +22,12 @@ import difflib
 import html
 import unicodedata
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
+
+if TYPE_CHECKING:
+    from subtitle_checker.subtitles.legibility import VideoLegibility
 
 
 class Evidence(Protocol):
@@ -76,6 +79,7 @@ def render_report(
     title: str,
     generated: str | None = None,
     skipped: list[tuple[SubtitleEvent, str]] | None = None,
+    legibility: VideoLegibility | None = None,
 ) -> str:
     """Render check results into one self-contained HTML document.
 
@@ -84,6 +88,9 @@ def render_report(
     worst-first; OK rows, if present, become a scan table below. ``skipped``
     lists detected lines the checker declined to verify, with reasons, so the
     editor sees they were passed over deliberately rather than missed.
+    ``legibility``, when supplied, adds the whole-video presentation grade and
+    its least legible lines - a channel-facing read separate from the mismatch
+    check.
     """
     flags = [r for r in results if r.verdict is not Verdict.OK]
     oks = [r for r in results if r.verdict is Verdict.OK]
@@ -94,8 +101,10 @@ def render_report(
     parts = [
         _head(title),
         _summary(title, results, stamp),
+        _legibility_banner(legibility),
         _flags_section(flags, evidence),
         _ledger_section(oks, evidence),
+        _legibility_section(legibility, evidence),
         _skipped_section(sorted(skipped or [], key=lambda s: s[0].start), evidence),
         _foot(),
     ]
@@ -216,6 +225,76 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
         f"{_score_cell(r)}<td>{audio}</td></tr>"
+    )
+
+
+# Legibility grade colour bands: clear, mixed, poor.
+_LEG_CLEAR = 85.0
+_LEG_MIXED = 60.0
+
+
+def _legibility_color(score: float) -> str:
+    if score >= _LEG_CLEAR:
+        return "#27ae60"
+    if score >= _LEG_MIXED:
+        return "#d35400"
+    return "#c0392b"
+
+
+def _legibility_headline(score: float) -> str:
+    if score >= _LEG_CLEAR:
+        return "Clear - the subtitles read easily on screen"
+    if score >= _LEG_MIXED:
+        return "Mixed - some lines are hard to read"
+    return "Poor - many lines wash out against the background"
+
+
+def _legibility_banner(leg: VideoLegibility | None) -> str:
+    """The whole-video legibility grade, front and centre for a channel."""
+    if leg is None:
+        return ""
+    color = _legibility_color(leg.score)
+    return (
+        '<section class="legibility"><h2>Subtitle legibility</h2>'
+        '<div class="leg-grade">'
+        f'<span class="leg-score" style="color:{color}">{leg.score:.0f}'
+        "<small>/100</small></span>"
+        '<div class="leg-caption">'
+        f'<p class="leg-headline">{_legibility_headline(leg.score)}</p>'
+        f'<p class="note">How readable the subtitles are on screen across '
+        f"{leg.line_count} line(s). Optical contrast between the text and its "
+        "background stands in for how easily a viewer - or an OCR engine - can "
+        "make out each word.</p></div></div></section>"
+    )
+
+
+def _legibility_section(leg: VideoLegibility | None, evidence: Evidence) -> str:
+    """The least legible lines, so a channel sees exactly which captions fail."""
+    if leg is None:
+        return ""
+    low = [line for line in leg.worst if line.score < 100]
+    if not low:
+        return ""
+    rows = "\n".join(_legibility_row(line, evidence) for line in low)
+    return (
+        '<section class="leg-lines"><h2>Least legible lines</h2>'
+        '<p class="note">The lowest-contrast subtitles in the video. A low score '
+        "means the text and its background are close in brightness, so the words "
+        "are hard to read.</p>"
+        "<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle (OCR read)</th>"
+        "<th>Legibility</th></tr></thead><tbody>"
+        f"{rows}</tbody></table></section>"
+    )
+
+
+def _legibility_row(line, evidence: Evidence) -> str:
+    thumb = _thumb_html(evidence.frame_png((line.start + line.end) / 2.0))
+    text = html.escape(line.text.strip()) or '<em class="none">- unreadable -</em>'
+    color = _legibility_color(line.score)
+    return (
+        f'<tr><td class="tspan">{_ts(line.start)}</td><td class="thumb">{thumb}</td>'
+        f'<td class="deva">{text}</td>'
+        f'<td class="score-cell" style="color:{color}">{line.score:.0f}</td></tr>'
     )
 
 
@@ -375,6 +454,14 @@ _STYLE = """<style>
   .score small { color:#888; font-weight:normal; font-size:.8rem; }
   .score-cell { text-align:center; font-weight:600; font-variant-numeric:tabular-nums;
                 cursor:help; }
+  .leg-grade { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap;
+               background:#fafafa; border:1px solid var(--line); border-radius:6px;
+               padding:1rem 1.2rem; }
+  .leg-score { font-size:3rem; font-weight:700; line-height:1;
+               font-variant-numeric:tabular-nums; }
+  .leg-score small { font-size:1.1rem; color:#aaa; font-weight:600; }
+  .leg-caption { flex:1; min-width:240px; }
+  .leg-headline { font-weight:600; margin:0 0 .3rem; }
   .card-body { display:flex; gap:1rem; padding:.8rem; flex-wrap:wrap; }
   .frame img { width:320px; max-width:100%; border-radius:4px; display:block; }
   .noframe { width:320px; height:120px; background:#f0f0f0; color:#aaa;
