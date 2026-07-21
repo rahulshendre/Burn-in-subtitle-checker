@@ -39,6 +39,23 @@ def build_parser() -> argparse.ArgumentParser:
         "(cloud quality engine, needs SARVAM_API_KEY)",
     )
 
+    leg = subparsers.add_parser(
+        "legibility",
+        help="Grade a video's subtitle legibility (Stage 1 only, no audio needed)",
+    )
+    leg.add_argument("--video", required=True, help="Path to the input video")
+    leg.add_argument("--lang", default="hi", help="ISO language code for OCR (hi, kn, mr)")
+    leg.add_argument("--out", default="out", help="Directory for the events artifact")
+    leg.add_argument(
+        "--ocr",
+        choices=["easyocr", "sarvam-vision"],
+        default="easyocr",
+        help="OCR engine used to read the worst lines (easyocr is local + free)",
+    )
+    leg.add_argument(
+        "--worst", type=int, default=None, help="How many least legible lines to list"
+    )
+
     rep = subparsers.add_parser(
         "report", help="Render a saved check into a self-contained HTML report"
     )
@@ -99,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(args)
+    if args.command == "legibility":
+        return _run_legibility(args)
     if args.command == "report":
         return _run_report(args)
     if args.command == "eval-detection":
@@ -158,8 +177,45 @@ def _run_check(args: argparse.Namespace) -> int:
         text = event.text.strip() or "<unreadable>"
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
 
+    _print_legibility(events)
     _run_audio_checks(video, events, out_dir, args.lang, args.asr)
     return 0
+
+
+def _run_legibility(args: argparse.Namespace) -> int:
+    video = Path(args.video)
+    if not video.exists():
+        print(f"video not found: {video}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.subtitles.reconstruct import reconstruct_subtitles
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    events = reconstruct_subtitles(video, engine=_build_ocr(args.ocr, args.lang))
+    save_artifact(out_dir / f"{video.stem}_subtitle_events.json", "subtitle_events", events)
+    if _print_legibility(events, args.worst) is None:
+        print("no readable subtitle lines to grade")
+    return 0
+
+
+def _print_legibility(events: list, worst_n: int | None = None):
+    """Print the whole-video legibility grade and its least legible lines."""
+    from subtitle_checker.subtitles.legibility import DEFAULT_WORST_N, video_legibility
+
+    grade = video_legibility(events, worst_n or DEFAULT_WORST_N)
+    if grade is None:
+        return None
+    print(f"\nlegibility: {grade.score:.0f}/100 over {grade.line_count} line(s)")
+    low = [line for line in grade.worst if line.score < 100]
+    if low:
+        print("least legible lines:")
+        for line in low:
+            text = line.text.strip() or "<unreadable>"
+            print(f"  {line.score:5.0f}  {line.start:7.2f}-{line.end:7.2f}  {text}")
+    return grade
 
 
 def _run_report(args: argparse.Namespace) -> int:
