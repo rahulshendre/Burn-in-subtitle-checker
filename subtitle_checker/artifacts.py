@@ -44,6 +44,7 @@ class SubtitleEvent:
     end: float
     text: str
     confidence: float = 1.0
+    legibility: float | None = None  # text-vs-background contrast 0..1 (None = unmeasured)
 
 
 @dataclass
