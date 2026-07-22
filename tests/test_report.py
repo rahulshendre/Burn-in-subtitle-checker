@@ -100,6 +100,8 @@ def test_ledger_has_score_column():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
     assert "<th>Score</th>" in out
     assert ">84<" in out  # the OK line's combined score, rounded for the cell
+    # both confidences show inline in the cell, not just on hover
+    assert "OCR 60%" in out and "audio 95%" in out
 
 
 def test_missing_subtitle_placeholder_when_no_text():

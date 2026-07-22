@@ -194,11 +194,12 @@ def _score_html(r: CheckResult) -> str:
 
 
 def _score_cell(r: CheckResult) -> str:
-    """Ledger score column: the combined number, breakdown on hover."""
+    """Ledger score column: the combined number over its OCR + audio parts."""
     if r.combined_score is None:
         return '<td class="score-cell">-</td>'
-    tip = html.escape(" · ".join(_score_breakdown(r)))
-    return f'<td class="score-cell" title="{tip}">{r.combined_score:.0f}</td>'
+    bits = _score_breakdown(r)
+    detail = f'<br><small>{html.escape(" · ".join(bits))}</small>' if bits else ""
+    return f'<td class="score-cell">{r.combined_score:.0f}{detail}</td>'
 
 
 def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
@@ -452,8 +453,8 @@ _STYLE = """<style>
   .tspan { font-variant-numeric:tabular-nums; color:#555; font-size:.9rem; }
   .score { margin-left:auto; color:#333; font-size:.9rem; font-weight:600; }
   .score small { color:#888; font-weight:normal; font-size:.8rem; }
-  .score-cell { text-align:center; font-weight:600; font-variant-numeric:tabular-nums;
-                cursor:help; }
+  .score-cell { text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
+  .score-cell small { color:#888; font-weight:normal; font-size:.72rem; }
   .leg-grade { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap;
                background:#fafafa; border:1px solid var(--line); border-radius:6px;
                padding:1rem 1.2rem; }
