@@ -73,3 +73,25 @@ def test_grade_is_duration_weighted() -> None:
     brief_bad = video_legibility([_event(0, 1, CONTRAST_FLOOR), _event(1, 11, CONTRAST_CEIL)])
     assert long_bad is not None and brief_bad is not None
     assert long_bad.score < brief_bad.score
+
+
+def test_bands_bucket_subtitle_time_by_readability() -> None:
+    # One clear line, one mixed, one poor - each a known on-screen duration. The
+    # bands report how many seconds of the video sit in each readability band.
+    span = CONTRAST_CEIL - CONTRAST_FLOOR
+    mixed = CONTRAST_FLOOR + 0.60 * span  # maps to score 60 -> Mixed
+    result = video_legibility(
+        [
+            _event(0, 4, CONTRAST_CEIL),  # score 100 -> Clear, 4s
+            _event(4, 6, mixed),  # score 60 -> Mixed, 2s
+            _event(6, 7, CONTRAST_FLOOR),  # score 0 -> Poor, 1s
+        ]
+    )
+    assert result is not None
+    assert [b.label for b in result.bands] == ["Clear", "Mixed", "Poor"]
+    assert {b.label: b.seconds for b in result.bands} == {
+        "Clear": 4.0,
+        "Mixed": 2.0,
+        "Poor": 1.0,
+    }
+    assert round(sum(b.share for b in result.bands), 5) == 1.0

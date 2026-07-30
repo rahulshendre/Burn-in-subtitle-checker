@@ -21,7 +21,7 @@ legible, and which ones are not" - separate from the audio mismatch check.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -43,6 +43,13 @@ CONTRAST_CEIL = 0.65
 
 # How many of the least legible lines to surface for a channel to inspect.
 DEFAULT_WORST_N = 5
+
+# Readability bands for the time breakdown a channel asked for: how many minutes
+# of the video read easily, sit borderline, or wash out. The two cutoffs tier the
+# per-line scores, and the report colours the whole-video banner off the same two
+# numbers, so the legibility read speaks one scale end to end.
+BAND_POOR = 50.0  # below this a line is hard to read
+BAND_CLEAR = 80.0  # at or above this a line reads easily; between the two = mixed
 
 
 def contrast(crop: np.ndarray) -> float:
@@ -81,12 +88,25 @@ class LineLegibility:
 
 
 @dataclass
+class LegibilityBand:
+    """One readability tier and how much subtitle time falls in it."""
+
+    label: str  # Clear / Mixed / Poor
+    low: float  # inclusive score floor of the band (0 for Poor)
+    high: float  # score ceiling of the band (100 for Clear)
+    seconds: float  # total subtitle time in this band
+    share: float  # fraction of measured subtitle time, 0..1
+    line_count: int
+
+
+@dataclass
 class VideoLegibility:
     """A whole-video legibility grade with the least legible lines called out."""
 
     score: float
     line_count: int
     worst: list[LineLegibility]
+    bands: list[LegibilityBand] = field(default_factory=list)
 
 
 def video_legibility(
@@ -117,4 +137,53 @@ def video_legibility(
     weights = [max(line.end - line.start, 1e-6) for line in lines]
     grade = sum(w * line.score for w, line in zip(weights, lines)) / sum(weights)
     worst = sorted(lines, key=lambda line: line.score)[:worst_n]
-    return VideoLegibility(score=round(grade, 1), line_count=len(lines), worst=worst)
+    return VideoLegibility(
+        score=round(grade, 1),
+        line_count=len(lines),
+        worst=worst,
+        bands=_legibility_bands(lines),
+    )
+
+
+def _band_label(score: float) -> str:
+    """Which readability band a per-line score falls in."""
+    if score >= BAND_CLEAR:
+        return "Clear"
+    if score >= BAND_POOR:
+        return "Mixed"
+    return "Poor"
+
+
+def _legibility_bands(lines: list[LineLegibility]) -> list[LegibilityBand]:
+    """Total subtitle time in each readability band, best to worst.
+
+    Each line's on-screen duration is added to its band, so the result answers
+    the channel's question directly: how many minutes of the video read clearly,
+    are borderline, or wash out. All three bands are always returned, at zero
+    seconds when empty, so the report shows a complete picture.
+    """
+    order = [
+        ("Clear", BAND_CLEAR, 100.0),
+        ("Mixed", BAND_POOR, BAND_CLEAR),
+        ("Poor", 0.0, BAND_POOR),
+    ]
+    seconds = {label: 0.0 for label, _, _ in order}
+    counts = {label: 0 for label, _, _ in order}
+    total = 0.0
+    for line in lines:
+        duration = max(line.end - line.start, 0.0)
+        total += duration
+        label = _band_label(line.score)
+        seconds[label] += duration
+        counts[label] += 1
+    return [
+        LegibilityBand(
+            label=label,
+            low=low,
+            high=high,
+            seconds=round(seconds[label], 1),
+            share=(seconds[label] / total if total > 0 else 0.0),
+            line_count=counts[label],
+        )
+        for label, low, high in order
+    ]

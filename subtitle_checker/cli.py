@@ -209,6 +209,10 @@ def _print_legibility(events: list, worst_n: int | None = None):
     if grade is None:
         return None
     print(f"\nlegibility: {grade.score:.0f}/100 over {grade.line_count} line(s)")
+    for band in grade.bands:
+        mins, secs = divmod(int(round(band.seconds)), 60)
+        clock = f"{mins}m{secs:02d}s"
+        print(f"  {band.label:5s} ({band.share * 100:3.0f}%)  {clock}")
     low = [line for line in grade.worst if line.score < 100]
     if low:
         print("least legible lines:")
