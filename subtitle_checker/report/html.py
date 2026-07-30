@@ -166,7 +166,7 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
         f'<div class="frame">{frame}</div>'
         f'<div class="detail">'
         f'<div class="texts">'
-        f'<div class="col"><h4>Subtitle (written)</h4><p class="deva">{written}</p></div>'
+        f'<div class="col"><h4>Written (OCR)</h4><p class="deva">{written}</p></div>'
         f'<div class="col"><h4>Heard (ASR)</h4><p class="deva">{heard}</p></div>'
         f"</div>"
         f'<p class="reason">{html.escape(r.reason)}</p>{audio}'
@@ -175,17 +175,17 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
 
 
 def _score_breakdown(r: CheckResult) -> list[str]:
-    """The OCR and audio confidences that fold into the combined score."""
+    """The OCR and ASR confidences that fold into the combined score."""
     bits = []
     if r.ocr_confidence is not None:
         bits.append(f"OCR {r.ocr_confidence:.0%}")
     if r.score is not None:
-        bits.append(f"audio {r.score:.0%}")
+        bits.append(f"ASR {r.score:.0%}")
     return bits
 
 
 def _score_html(r: CheckResult) -> str:
-    """Card-head score: the one combined confidence with its OCR + audio parts."""
+    """Card-head score: the one combined confidence with its OCR + ASR parts."""
     if r.combined_score is None:
         return ""
     bits = _score_breakdown(r)
@@ -194,7 +194,7 @@ def _score_html(r: CheckResult) -> str:
 
 
 def _score_cell(r: CheckResult) -> str:
-    """Ledger score column: the combined number over its OCR + audio parts."""
+    """Ledger score column: the combined number over its OCR + ASR parts."""
     if r.combined_score is None:
         return '<td class="score-cell">-</td>'
     bits = _score_breakdown(r)
@@ -210,7 +210,7 @@ def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
         '<section class="ledger"><h2>Matching lines - heard vs written</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
-        '<table><thead><tr><th>Time</th><th>Frame</th><th>Written</th>'
+        '<table><thead><tr><th>Time</th><th>Frame</th><th>Written (OCR)</th>'
         "<th>Heard (ASR)</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
@@ -229,16 +229,18 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     )
 
 
-# Legibility grade colour bands: clear, mixed, poor.
-_LEG_CLEAR = 85.0
-_LEG_MIXED = 60.0
+# Legibility grade colour bands: clear, mixed, poor. Same score cutoffs as the
+# time breakdown (subtitles.legibility BAND_CLEAR / BAND_POOR), so the whole-video
+# grade and the per-band minutes speak one scale.
+_LEG_CLEAR = 80.0
+_LEG_MIXED = 50.0
 
 
 def _legibility_color(score: float) -> str:
     if score >= _LEG_CLEAR:
         return "#27ae60"
     if score >= _LEG_MIXED:
-        return "#d35400"
+        return "#d4a017"
     return "#c0392b"
 
 
@@ -265,7 +267,59 @@ def _legibility_banner(leg: VideoLegibility | None) -> str:
         f'<p class="note">How readable the subtitles are on screen across '
         f"{leg.line_count} line(s). Optical contrast between the text and its "
         "background stands in for how easily a viewer - or an OCR engine - can "
-        "make out each word.</p></div></div></section>"
+        "make out each word.</p></div></div>"
+        f"{_legibility_bands_html(leg)}"
+        "</section>"
+    )
+
+
+# Band colours match the grade bands: clear green, mixed yellow, poor red.
+_BAND_COLOR = {"Clear": "#27ae60", "Mixed": "#d4a017", "Poor": "#c0392b"}
+
+
+def _band_range_label(label: str) -> str:
+    """The score range for a band, in words a channel reads at a glance."""
+    if label == "Clear":
+        return "80 and above"
+    if label == "Mixed":
+        return "50 to 80"
+    return "below 50"
+
+
+def _fmt_duration(seconds: float) -> str:
+    """Seconds as minutes and seconds, e.g. 2 min 34 s (or just seconds under a minute)."""
+    whole = int(round(seconds))
+    minutes, secs = divmod(whole, 60)
+    return f"{minutes} min {secs} s" if minutes else f"{secs} s"
+
+
+def _legibility_bands_html(leg: VideoLegibility) -> str:
+    """Time-by-band breakdown: how many minutes of the video read clearly, sit
+    borderline, or wash out. Channel-facing, so each band shows its minutes big
+    and colour-coded - no percentages, which read as jargon to a channel.
+    """
+    total = sum(b.seconds for b in leg.bands)
+    if total <= 0:
+        return ""
+    bar = "".join(
+        f'<span style="width:{b.share * 100:.1f}%;background:{_BAND_COLOR[b.label]}"></span>'
+        for b in leg.bands
+        if b.seconds > 0
+    )
+    cards = "".join(
+        f'<div class="leg-band-card">'
+        f'<span class="leg-band-time" style="color:{_BAND_COLOR[b.label]}">'
+        f"{_fmt_duration(b.seconds)}</span>"
+        f'<span class="leg-band-label"><strong>{b.label}</strong><br>'
+        f"legibility {_band_range_label(b.label)}</span></div>"
+        for b in leg.bands
+    )
+    return (
+        '<div class="leg-bands">'
+        '<p class="note">How much of the subtitled video reads clearly, sits '
+        "borderline, or washes out:</p>"
+        f'<div class="leg-bar">{bar}</div>'
+        f'<div class="leg-band-cards">{cards}</div></div>'
     )
 
 
@@ -463,6 +517,15 @@ _STYLE = """<style>
   .leg-score small { font-size:1.1rem; color:#aaa; font-weight:600; }
   .leg-caption { flex:1; min-width:240px; }
   .leg-headline { font-weight:600; margin:0 0 .3rem; }
+  .leg-bands { margin-top:1rem; }
+  .leg-bar { display:flex; height:18px; border-radius:9px; overflow:hidden;
+             margin:.4rem 0 .9rem; background:#eee; }
+  .leg-bar span { display:block; height:100%; }
+  .leg-band-cards { display:flex; gap:1.6rem; flex-wrap:wrap; }
+  .leg-band-card { display:flex; flex-direction:column; min-width:130px; }
+  .leg-band-time { font-size:2rem; font-weight:700; line-height:1.1;
+                   font-variant-numeric:tabular-nums; }
+  .leg-band-label { font-size:.85rem; color:#555; margin-top:.15rem; }
   .card-body { display:flex; gap:1rem; padding:.8rem; flex-wrap:wrap; }
   .frame img { width:320px; max-width:100%; border-radius:4px; display:block; }
   .noframe { width:320px; height:120px; background:#f0f0f0; color:#aaa;

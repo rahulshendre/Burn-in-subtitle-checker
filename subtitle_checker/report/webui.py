@@ -75,7 +75,7 @@ def relabel(entries: list[ReportEntry], labels: list[str]) -> list[ReportEntry]:
     ]
 
 
-def render_index(entries: list[ReportEntry], *, title: str = "Subtitle Checker") -> str:
+def render_index(entries: list[ReportEntry], *, title: str = "Burn-in subtitle checker") -> str:
     """Render the picker shell that loads a report into an iframe."""
     if entries:
         options = "".join(
@@ -124,7 +124,7 @@ _STYLE = """<style>
            border:1px solid #cfe; min-width:16rem; }
   button { font-size:.95rem; padding:.35rem 1rem; border:0; border-radius:5px;
            background:#2a6; color:#fff; font-weight:600; cursor:pointer; }
-  button:hover { background:#238; background:#1f6f43; }
+  button:hover { background:#1f6f43; }
   iframe { width:100%; height:calc(100vh - 52px); border:0; background:#fff; }
   .empty { color:#777; padding:2rem 1.2rem; }
 </style>"""
@@ -165,7 +165,7 @@ def serve(
     host: str = "127.0.0.1",
     port: int = 8000,
     open_browser: bool = True,
-    title: str = "Subtitle Checker",
+    title: str = "Burn-in subtitle checker",
 ) -> None:
     """Serve the picker and reports on a local port until interrupted."""
     index_html = render_index(entries, title=title)

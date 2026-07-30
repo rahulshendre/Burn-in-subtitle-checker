@@ -91,9 +91,9 @@ def test_ok_rows_go_to_ledger_table():
 
 def test_combined_score_shown_on_card():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    # the fused score headlines the card, with the OCR + audio breakdown beside it
+    # the fused score headlines the card, with the OCR + ASR breakdown beside it
     assert "score 39" in out
-    assert "OCR 80%" in out and "audio 21%" in out
+    assert "OCR 80%" in out and "ASR 21%" in out
 
 
 def test_ledger_has_score_column():
@@ -101,7 +101,7 @@ def test_ledger_has_score_column():
     assert "<th>Score</th>" in out
     assert ">84<" in out  # the OK line's combined score, rounded for the cell
     # both confidences show inline in the cell, not just on hover
-    assert "OCR 60%" in out and "audio 95%" in out
+    assert "OCR 60%" in out and "ASR 95%" in out
 
 
 def test_missing_subtitle_placeholder_when_no_text():
@@ -171,6 +171,21 @@ def test_legibility_banner_shows_grade_and_headline():
     assert "Subtitle legibility" in out
     assert "89<small>/100</small>" in out
     assert "read easily" in out  # the clear-band headline
+
+
+def test_legibility_banner_shows_time_by_band():
+    from subtitle_checker.subtitles.legibility import LegibilityBand
+
+    leg = _legibility(70.0, [(1.0, 2.0, "बुरा तो तब होगा", 0.45, 40.0)])
+    leg.bands = [
+        LegibilityBand("Clear", 80.0, 100.0, 120.0, 0.6, 3),
+        LegibilityBand("Mixed", 50.0, 80.0, 60.0, 0.3, 2),
+        LegibilityBand("Poor", 0.0, 50.0, 20.0, 0.1, 1),
+    ]
+    out = render_report(_sample(), FakeEvidence(), title="Demo", legibility=leg)
+    assert "2 min 0 s" in out  # 120s of Clear time, formatted as minutes
+    assert "80 and above" in out and "below 50" in out  # the band ranges in words
+    assert "of subtitle time" not in out  # percentages dropped - channel does not read %
 
 
 def test_legibility_section_lists_low_lines():
