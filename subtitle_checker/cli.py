@@ -144,6 +144,24 @@ def _run_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _require_video(path_str: str) -> Path | None:
+    """Return the video path if it exists, else print an error and return None."""
+    video = Path(path_str)
+    if video.exists():
+        return video
+    print(f"video not found: {video}", file=sys.stderr)
+    return None
+
+
+def _report_title(video: Path) -> str:
+    return f"Subtitle check - {video.stem}"
+
+
+def _sibling_artifact(results_path: Path, video: Path, name: str) -> Path:
+    """Path to a stage artifact saved next to the check results."""
+    return results_path.parent / f"{video.stem}_{name}.json"
+
+
 def _build_ocr(name: str, lang: str):
     """Build the OCR engine named on the command line."""
     if name == "sarvam-vision":
@@ -156,9 +174,8 @@ def _build_ocr(name: str, lang: str):
 
 
 def _run_check(args: argparse.Namespace) -> int:
-    video = Path(args.video)
-    if not video.exists():
-        print(f"video not found: {video}", file=sys.stderr)
+    video = _require_video(args.video)
+    if video is None:
         return 2
 
     from subtitle_checker.artifacts import save_artifact
@@ -183,9 +200,8 @@ def _run_check(args: argparse.Namespace) -> int:
 
 
 def _run_legibility(args: argparse.Namespace) -> int:
-    video = Path(args.video)
-    if not video.exists():
-        print(f"video not found: {video}", file=sys.stderr)
+    video = _require_video(args.video)
+    if video is None:
         return 2
 
     from subtitle_checker.artifacts import save_artifact
@@ -223,9 +239,8 @@ def _print_legibility(events: list, worst_n: int | None = None):
 
 
 def _run_report(args: argparse.Namespace) -> int:
-    video = Path(args.video)
-    if not video.exists():
-        print(f"video not found: {video}", file=sys.stderr)
+    video = _require_video(args.video)
+    if video is None:
         return 2
 
     results_path = _resolve_results(Path(args.results), video)
@@ -246,7 +261,7 @@ def _run_report(args: argparse.Namespace) -> int:
     legibility = _load_legibility(results_path, video)
     write_report(
         video, results, out,
-        title=f"Subtitle check - {video.stem}", skipped=skipped, legibility=legibility,
+        title=_report_title(video), skipped=skipped, legibility=legibility,
     )
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
@@ -257,7 +272,7 @@ def _load_legibility(results_path: Path, video: Path) -> object | None:
     from subtitle_checker.artifacts import load_artifact
     from subtitle_checker.subtitles.legibility import video_legibility
 
-    events_path = results_path.parent / f"{video.stem}_subtitle_events.json"
+    events_path = _sibling_artifact(results_path, video, "subtitle_events")
     if not events_path.exists():
         return None
     return video_legibility(load_artifact(events_path)[1])
@@ -268,11 +283,11 @@ def _load_skipped(results_path: Path, video: Path, results: list) -> list | None
     from subtitle_checker.artifacts import load_artifact
     from subtitle_checker.match.asr import skipped_lines
 
-    events_path = results_path.parent / f"{video.stem}_subtitle_events.json"
+    events_path = _sibling_artifact(results_path, video, "subtitle_events")
     if not events_path.exists():
         return None
     _, events = load_artifact(events_path)
-    regions_path = results_path.parent / f"{video.stem}_audio_regions.json"
+    regions_path = _sibling_artifact(results_path, video, "audio_regions")
     regions = load_artifact(regions_path)[1] if regions_path.exists() else None
     return skipped_lines(events, results, regions)
 
@@ -399,15 +414,14 @@ def _write_report(
     path = out_dir / f"{video.stem}_report.html"
     write_report(
         video, results, path,
-        title=f"Subtitle check - {video.stem}", skipped=skipped, legibility=legibility,
+        title=_report_title(video), skipped=skipped, legibility=legibility,
     )
     print(f"report -> {path}")
 
 
 def _run_eval_detection(args: argparse.Namespace) -> int:
-    clip = Path(args.clean_clip)
-    if not clip.exists():
-        print(f"video not found: {clip}", file=sys.stderr)
+    clip = _require_video(args.clean_clip)
+    if clip is None:
         return 2
 
     from subtitle_checker.evaluation.detection import evaluate_detection
@@ -452,9 +466,8 @@ def _run_eval_structural(args: argparse.Namespace) -> int:
 
 
 def _run_eval_alignment(args: argparse.Namespace) -> int:
-    video = Path(args.video)
-    if not video.exists():
-        print(f"video not found: {video}", file=sys.stderr)
+    video = _require_video(args.video)
+    if video is None:
         return 2
 
     from subtitle_checker.evaluation.alignment_eval import evaluate_alignment
