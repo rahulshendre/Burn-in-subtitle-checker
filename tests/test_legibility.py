@@ -67,6 +67,24 @@ def test_video_legibility_grades_and_surfaces_worst_lines() -> None:
     assert result.worst[0].start == 1  # the least legible line comes first
 
 
+def test_unreadable_line_is_not_scored() -> None:
+    # A band with bright, high-contrast pixels but no caption OCR could read must
+    # not surface a legibility score - contrast would grade the scene, not a line.
+    events = [
+        _event(0, 1, CONTRAST_CEIL),  # a real, readable line
+        SubtitleEvent(start=1, end=2, text="", legibility=CONTRAST_CEIL),  # unreadable
+    ]
+    result = video_legibility(events, worst_n=5)
+    assert result is not None
+    assert result.line_count == 1
+    assert all(line.text for line in result.worst)
+
+
+def test_none_when_only_unreadable_lines() -> None:
+    events = [SubtitleEvent(start=0, end=1, text="  ", legibility=CONTRAST_CEIL)]
+    assert video_legibility(events) is None
+
+
 def test_grade_is_duration_weighted() -> None:
     # A long illegible caption drags the grade further than a brief flash would.
     long_bad = video_legibility([_event(0, 10, CONTRAST_FLOOR), _event(10, 11, CONTRAST_CEIL)])

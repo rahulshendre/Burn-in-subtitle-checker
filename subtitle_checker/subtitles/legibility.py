@@ -115,7 +115,9 @@ def video_legibility(
     """Grade a whole video's subtitle legibility from its measured events.
 
     Reads the per-line ``legibility`` contrast set at detection time; events with
-    no measured contrast (nothing to read) are skipped. The grade is the
+    no measured contrast, or with no subtitle text OCR could read, are skipped -
+    contrast is a pixel measurement, so a band with no readable caption would
+    otherwise score the scene behind it, not a subtitle. The grade is the
     duration-weighted mean of the per-line scores - a long low-contrast caption
     hurts a viewer more than a brief flash - and ``worst`` lists the lowest
     scorers for inspection. Returns None when no line could be measured.
@@ -129,7 +131,7 @@ def video_legibility(
             score=line_score(e.legibility),
         )
         for e in events
-        if e.legibility is not None
+        if e.legibility is not None and e.text.strip()
     ]
     if not lines:
         return None
