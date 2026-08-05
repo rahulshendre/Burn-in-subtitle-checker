@@ -116,6 +116,8 @@ def check_structural(
         span = event.end - event.start
         if span <= 0:
             continue
+        if not event.text.strip():
+            continue  # OCR read no subtitle here - nothing to make a claim about
         if event_has_speech(event, regions):
             continue  # has dialogue - Stage 3 checks the words
         music = _kind_overlap(event, regions, AudioKind.MUSIC)

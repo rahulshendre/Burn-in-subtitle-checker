@@ -36,6 +36,14 @@ def test_subtitle_over_music_is_uncheckable_not_orphan() -> None:
     assert len(_verdicts(results, Verdict.UNCHECKABLE)) == 1
 
 
+def test_unreadable_event_makes_no_claim() -> None:
+    # OCR read nothing here (a false detection, or a subtitle it could not read);
+    # with no text there is no subtitle to call ORPHAN or UNCHECKABLE.
+    events = [SubtitleEvent(1.0, 3.0, ""), SubtitleEvent(4.0, 6.0, "   ")]
+    regions = [AudioRegion(0.0, 8.0, AudioKind.MUSIC)]
+    assert check_structural(events, regions) == []
+
+
 def test_speech_with_no_subtitle_is_missing() -> None:
     events: list[SubtitleEvent] = []
     regions = [AudioRegion(2.0, 4.0, AudioKind.SPEECH)]
