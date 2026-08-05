@@ -7,7 +7,20 @@ bleeding into the crop) and their eyeballed truth.
 from subtitle_checker.subtitles.ocr import (
     SARVAM_VISION_TRUSTED_CONF,
     _is_devanagari_line,
+    _is_image_description,
     _vision_text,
+)
+
+# The two real Sarvam Vision captions from the Mann guidelines clip, where it
+# narrated a no-subtitle scene frame instead of reading a subtitle.
+_DESCRIBE_1 = (
+    "यह छवि एक ग्रेस्केल (black and white) है जिसमें एक व्यक्ति के हाथ पर दो मोतियों की "
+    "मालाएँ दिखाई दे रही हैं। हाथ पर एक सफेद कपड़े की कढ़ाई है।"
+)
+_DESCRIBE_2 = (
+    "यह छवि एक ग्रेस्केल (black and white) है जिसमें एक व्यक्ति के हाथ दिखाई दे रहे हैं, "
+    "जिन्होंने एक सफेद कपड़े पर मोतियों की माला पहनी हुई है। यह दृश्य किसी पारंपरिक भारतीय "
+    "शादी के परिधान का है।"
 )
 
 
@@ -47,3 +60,30 @@ def test_vision_text_empty_when_only_chrome():
     text, conf = _vision_text(["TATA PL", "177374"])
     assert text == ""
     assert conf == 0.0
+
+
+def test_flags_image_description_captions():
+    # Sarvam narrated the frame - English rendering term and image-referent opener
+    assert _is_image_description(_DESCRIBE_1)
+    assert _is_image_description(_DESCRIBE_2)
+    assert _is_image_description("यह दृश्य किसी पारंपरिक भारतीय शादी का है।")
+
+
+def test_keeps_dialogue_that_merely_mentions_an_image():
+    # A line is only a caption when a referent opens it, not when one appears
+    assert not _is_image_description("मेरी छवि आईने में धुंधली थी।")
+    assert not _is_image_description("हम सबसे नज़रें कैसे मिला पाएँगे?")
+    assert not _is_image_description("आज हमारे कारण")
+
+
+def test_vision_text_drops_narrated_frame():
+    # A block that is a picture caption must not become a subtitle line
+    text, conf = _vision_text([_DESCRIBE_1])
+    assert text == ""
+    assert conf == 0.0
+
+
+def test_vision_text_keeps_real_line_beside_a_caption():
+    text, conf = _vision_text(["और बुरा तो तब होगा।", _DESCRIBE_2])
+    assert text == "और बुरा तो तब होगा।"
+    assert conf == SARVAM_VISION_TRUSTED_CONF

@@ -84,15 +84,57 @@ class EasyOcrEngine:
 SARVAM_VISION_TRUSTED_CONF = 0.99
 
 
+# Fed a band with no legible subtitle, Sarvam Vision sometimes narrates the
+# picture instead of transcribing it, e.g. `यह छवि एक ग्रेस्केल (black and white)
+# है जिसमें एक व्यक्ति के हाथ पर दो मोतियों की मालाएँ दिखाई दे रही हैं।` (this image
+# is grayscale, showing pearl garlands on a hand). That caption is not a
+# subtitle and must not become a subtitle line. It carries give-away markers a
+# dialogue line never has: an English rendering term reported in the OCR
+# output, or an image/scene referent that opens the sentence.
+_DESCRIBE_MARKERS = (
+    "ग्रेस्केल",  # grayscale, transliterated
+    "grayscale",
+    "greyscale",
+    "black and white",
+)
+_DESCRIBE_OPENERS = (
+    "यह छवि",  # this image ...
+    "यह दृश्य",  # this scene ...
+    "यह तस्वीर",  # this picture ...
+    "इस छवि",
+    "इस तस्वीर",
+    "छवि में",  # in the image ...
+    "तस्वीर में",  # in the picture ...
+)
+
+
+def _is_image_description(text: str) -> bool:
+    """True when Sarvam Vision narrated the frame instead of reading a subtitle.
+
+    Recognised by markers a dialogue subtitle never carries: an English
+    rendering term anywhere in the text (`black and white`, `grayscale`), or an
+    image/scene referent that opens the sentence (`यह छवि ...`, `यह दृश्य ...`).
+    Kept tight - the openers must lead - so a line that merely mentions an image
+    is not mistaken for a caption.
+    """
+    low = text.lower()
+    if any(m in low for m in _DESCRIBE_MARKERS):
+        return True
+    stripped = text.lstrip()
+    return any(stripped.startswith(o) for o in _DESCRIBE_OPENERS)
+
+
 def _vision_text(blocks: list[str]) -> tuple[str, float]:
-    """Join Sarvam Vision text blocks into one line, dropping chrome/logo boxes.
+    """Join Sarvam Vision text blocks into one line, dropping non-subtitle boxes.
 
     Sarvam reads the whole crop, so a channel logo that survived Stage-1
     chrome subtraction (`DD Free Dish`, `TATA PLAY`) comes back as its own
     block; the same Devanagari content test used for EasyOCR drops it. A logo
     merged into a real line's block is lost with it - the EasyOCR limit too.
+    Image-description captions (see _is_image_description) are dropped as well,
+    so a narrated frame does not surface as a spurious subtitle line.
     """
-    lines = [b for b in blocks if _is_devanagari_line(b)]
+    lines = [b for b in blocks if _is_devanagari_line(b) and not _is_image_description(b)]
     if not lines:
         return "", 0.0
     return " ".join(lines), SARVAM_VISION_TRUSTED_CONF
