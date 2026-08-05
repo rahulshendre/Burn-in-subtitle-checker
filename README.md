@@ -4,7 +4,7 @@ Flags moments where the spoken audio and the burned-in subtitles of a video do
 not match, so a reviewer can jump straight to the flagged spots instead of
 watching the whole file.
 
-Built for PlanetRead and for content with Same Language Subtitling (SLS) content under C4GT DMP
+Built for PlanetRead's Same Language Subtitling (SLS) content under C4GT DMP
 2026, issue [#3](https://github.com/PlanetRead/Burn-in-subtitle-checker/issues/3).
 
 ## The idea
@@ -28,8 +28,8 @@ pipeline against planted errors.
 ## Where the code is
 
 The work is built stage by stage, each on its own reviewable branch. The
-branches stack, so the tip branch `feat/align-rescue` contains the full current
-pipeline.
+branches stack, so the tip branch `feat/ocr-describe-guard` contains the full
+current pipeline.
 
 | Branch | What it adds |
 |--------|--------------|
@@ -42,12 +42,19 @@ pipeline.
 | `feat/ocr-junk-filter` | drop OCR junk boxes from logo and chrome leakage |
 | `feat/region-chrome` | drop animated channel logos via region presence |
 | `feat/coverage-metric` | measure how many lines Stage 3 actually verifies |
-| `feat/align-rescue` | verify low-confidence lines that align strongly (current tip) |
+| `feat/align-rescue` | verify low-confidence lines that align strongly |
+| `feat/web-ui` | minimal local web UI to browse reports |
+| `feat/sarvam-vision-ocr` | Sarvam Vision as an opt-in higher-quality OCR engine |
+| `feat/matra-defect` | matra-swap error injection and heard-vs-written highlighting |
+| `feat/saaras-v3-asr` | move the Sarvam ASR cross-check to Saaras v3 |
+| `feat/combined-score` | fuse OCR and audio confidence into one per-line score |
+| `feat/legibility-score` | per-line contrast, whole-video legibility grade, time bands |
+| `feat/ocr-describe-guard` | guard against OCR describe-mode and unreadable lines (current tip) |
 
 ## Development
 
 ```bash
-git checkout feat/align-rescue
+git checkout feat/ocr-describe-guard
 pip install -e ".[dev]"
 ruff check .
 pytest
