@@ -8,6 +8,7 @@ from subtitle_checker.subtitles.ocr import (
     SARVAM_VISION_TRUSTED_CONF,
     _is_devanagari_line,
     _is_image_description,
+    _strip_channel_logo,
     _vision_text,
 )
 
@@ -86,4 +87,28 @@ def test_vision_text_drops_narrated_frame():
 def test_vision_text_keeps_real_line_beside_a_caption():
     text, conf = _vision_text(["और बुरा तो तब होगा।", _DESCRIBE_2])
     assert text == "और बुरा तो तब होगा।"
+    assert conf == SARVAM_VISION_TRUSTED_CONF
+
+
+def test_strip_channel_logo_removes_merged_tata_play():
+    # Real Sarvam Vision blocks from the without-guidelines clip, where the
+    # TATA PLAY logo merged into the same block as the subtitle line.
+    assert _strip_channel_logo("खुशी की क्या ही बात है? TATA PL") == "खुशी की क्या ही बात है?"
+    assert _strip_channel_logo("नॉनस्टॉप बोले जा रहे हो। TATA PLAY") == "नॉनस्टॉप बोले जा रहे हो।"
+    assert (
+        _strip_channel_logo("मैंने हमेशा आपको सपोर्ट किया है कृष, हमेशा। TATA PLAY")
+        == "मैंने हमेशा आपको सपोर्ट किया है कृष, हमेशा।"
+    )
+
+
+def test_strip_channel_logo_leaves_a_clean_line_untouched():
+    assert _strip_channel_logo("हम ये घर छोड़कर जा रहे हैं।") == "हम ये घर छोड़कर जा रहे हैं।"
+    assert _strip_channel_logo("मेरे बेटे को") == "मेरे बेटे को"
+
+
+def test_vision_text_strips_logo_merged_into_a_real_line():
+    # The merged-logo block passes the Devanagari test, so it must be cleaned
+    # in place rather than dropped whole (dropping it would lose the subtitle).
+    text, conf = _vision_text(["इस तरह इन्सल्ट करती हैं? TATA PLAY"])
+    assert text == "इस तरह इन्सल्ट करती हैं?"
     assert conf == SARVAM_VISION_TRUSTED_CONF

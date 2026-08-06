@@ -8,6 +8,7 @@ that reads hard Devanagari bands more accurately at the cost of a cloud call.
 
 from __future__ import annotations
 
+import re
 from typing import Protocol
 
 import numpy as np
@@ -124,17 +125,44 @@ def _is_image_description(text: str) -> bool:
     return any(stripped.startswith(o) for o in _DESCRIBE_OPENERS)
 
 
+# A channel logo Sarvam Vision merges into the same block as the subtitle
+# (e.g. `खुशी की क्या ही बात है? TATA PLAY`) rides along with the Devanagari line,
+# so the block-level content test keeps it. The logos on this footage are
+# Latin-script (`TATA PLAY`, `DD Free Dish`, `MELBON`) while a burned Hindi
+# subtitle is pure Devanagari, so a run of Latin letters inside an
+# otherwise-Devanagari line is the logo and is removed. Truncated OCR reads
+# (`TATA PL`, `TATA P`) fall out of the same rule. Only Devanagari-majority
+# blocks reach here (a Latin-majority block is dropped whole upstream), so this
+# never strips a line that is legitimately another script.
+_LATIN_RUN = re.compile(r"[A-Za-z]+(?:\s+[A-Za-z]+)*")
+_SPACE_BEFORE_PUNCT = re.compile(r"\s+([?!.,।])")
+
+
+def _strip_channel_logo(text: str) -> str:
+    """Remove a Latin-script channel logo merged into a Devanagari subtitle line.
+
+    Cuts any run of Latin words out of the line, then tidies the gap it left:
+    collapses the doubled spaces and drops a space stranded before punctuation.
+    A pure Devanagari line has no Latin run and comes back unchanged.
+    """
+    cleaned = _LATIN_RUN.sub(" ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return _SPACE_BEFORE_PUNCT.sub(r"\1", cleaned)
+
+
 def _vision_text(blocks: list[str]) -> tuple[str, float]:
     """Join Sarvam Vision text blocks into one line, dropping non-subtitle boxes.
 
     Sarvam reads the whole crop, so a channel logo that survived Stage-1
     chrome subtraction (`DD Free Dish`, `TATA PLAY`) comes back as its own
     block; the same Devanagari content test used for EasyOCR drops it. A logo
-    merged into a real line's block is lost with it - the EasyOCR limit too.
-    Image-description captions (see _is_image_description) are dropped as well,
-    so a narrated frame does not surface as a spurious subtitle line.
+    merged into a real line's block instead is stripped in place (see
+    _strip_channel_logo). Image-description captions (see _is_image_description)
+    are dropped as well, so a narrated frame does not surface as a spurious
+    subtitle line.
     """
     lines = [b for b in blocks if _is_devanagari_line(b) and not _is_image_description(b)]
+    lines = [stripped for b in lines if (stripped := _strip_channel_logo(b))]
     if not lines:
         return "", 0.0
     return " ".join(lines), SARVAM_VISION_TRUSTED_CONF
