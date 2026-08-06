@@ -41,6 +41,14 @@ MIN_TOKEN_RATIO = 65.0
 # Match alignment's trust gates: do not cross-check garbled OCR or tiny lines.
 MIN_OCR_CONF = 0.5
 MIN_WORDS = 3
+# A gross mismatch needs a long enough line behind it, mirroring alignment's
+# MIN_MISMATCH_SPAN. A caption under ~1.5 s is too little audio for the ASR to
+# transcribe reliably, so a low word-match on it is as likely a garbled short
+# window as a wrong subtitle. Guideline-compliant one-line captions run this
+# short, so without the floor they produced most of the false flags. The line
+# still appears in the ledger with its heard-vs-written for the editor - it is
+# only held back from the auto-flag list.
+MIN_MISMATCH_SPAN = 1.5
 
 SARVAM_URL = "https://api.sarvam.ai/speech-to-text"
 # Saaras v3 is Sarvam's current STT model; Saarika v2.5 is being deprecated. Its
@@ -140,6 +148,7 @@ def transcribe_lines(
     min_ratio: float = MIN_TOKEN_RATIO,
     min_ocr_conf: float = MIN_OCR_CONF,
     min_words: int = MIN_WORDS,
+    min_span: float = MIN_MISMATCH_SPAN,
     sample_rate: int = SAMPLE_RATE,
     pad: float = WINDOW_PAD_S,
 ) -> list[CheckResult]:
@@ -147,8 +156,11 @@ def transcribe_lines(
 
     One CheckResult per trusted, speech-covered line - OK when the heard words
     match the subtitle, TEXT_MISMATCH when they diverge grossly - each carrying
-    heard_text. The OK rows are what let an editor eyeball the subtle single-word
-    errors that sit below the auto-flag noise floor (see the module docstring).
+    heard_text. A low match on a line shorter than ``min_span`` stays OK (too
+    little audio to trust the mismatch), still shown in the ledger but held back
+    from the flags. The OK rows are what let an editor eyeball the subtle
+    single-word errors that sit below the auto-flag noise floor (see the module
+    docstring).
     """
     results: list[CheckResult] = []
     for event in events:
@@ -158,18 +170,22 @@ def transcribe_lines(
         if heard_ratio is None:
             continue
         heard, ratio = heard_ratio
-        mismatch = ratio < min_ratio
         match = ratio / 100.0
+        if ratio >= min_ratio:
+            verdict = Verdict.OK
+            reason = f"heard words match the subtitle (match {ratio:.0f}%)"
+        elif event.end - event.start < min_span:
+            verdict = Verdict.OK
+            reason = f"line too short to flag a mismatch (match {ratio:.0f}%)"
+        else:
+            verdict = Verdict.TEXT_MISMATCH
+            reason = f"heard words differ from the subtitle (match {ratio:.0f}%)"
         results.append(
             CheckResult(
                 start=event.start,
                 end=event.end,
-                verdict=Verdict.TEXT_MISMATCH if mismatch else Verdict.OK,
-                reason=(
-                    f"heard words differ from the subtitle (match {ratio:.0f}%)"
-                    if mismatch
-                    else f"heard words match the subtitle (match {ratio:.0f}%)"
-                ),
+                verdict=verdict,
+                reason=reason,
                 subtitle_text=event.text,
                 heard_text=heard,
                 score=match,
@@ -226,6 +242,7 @@ def check_asr(
     min_ratio: float = MIN_TOKEN_RATIO,
     min_ocr_conf: float = MIN_OCR_CONF,
     min_words: int = MIN_WORDS,
+    min_span: float = MIN_MISMATCH_SPAN,
     sample_rate: int = SAMPLE_RATE,
     pad: float = WINDOW_PAD_S,
 ) -> list[CheckResult]:
@@ -238,7 +255,7 @@ def check_asr(
         r
         for r in transcribe_lines(
             events, audio, regions, engine,
-            min_ratio, min_ocr_conf, min_words, sample_rate, pad,
+            min_ratio, min_ocr_conf, min_words, min_span, sample_rate, pad,
         )
         if r.verdict is Verdict.TEXT_MISMATCH
     ]

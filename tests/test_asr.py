@@ -19,6 +19,9 @@ SPEECH = [AudioRegion(0.0, 6.0, AudioKind.SPEECH)]
 MUSIC = [AudioRegion(0.0, 6.0, AudioKind.MUSIC)]
 AUDIO = np.zeros(16_000 * 8, dtype=np.float32)
 LINE = SubtitleEvent(1.0, 4.0, "एक दो तीन चार", 0.9)
+# A guideline-short one-line caption (0.75 s) - a real batch2 false-flag case,
+# where the ASR garbled the tiny audio window while the subtitle was correct.
+SHORT_LINE = SubtitleEvent(1.0, 1.75, "तोशु के तानों को", 0.99)
 
 
 class ScriptedAsr:
@@ -89,6 +92,22 @@ def test_check_asr_keeps_only_mismatches() -> None:
     flags = check_asr(events, AUDIO, SPEECH, engine)
     assert len(flags) == 1
     assert flags[0].verdict is Verdict.TEXT_MISMATCH
+
+
+def test_short_line_mismatch_is_not_flagged() -> None:
+    # Below MIN_MISMATCH_SPAN a low match is too likely a garbled short window
+    # to accuse the subtitle, so it is held back from the flags.
+    assert check_asr([SHORT_LINE], AUDIO, SPEECH, ScriptedAsr("पाँच छह सात आठ")) == []
+
+
+def test_short_line_mismatch_still_shown_in_ledger() -> None:
+    # Held back from the flags, but still an OK ledger row so the editor sees
+    # the heard-vs-written and its match percentage.
+    rows = transcribe_lines([SHORT_LINE], AUDIO, SPEECH, ScriptedAsr("पाँच छह सात आठ"))
+    assert len(rows) == 1
+    assert rows[0].verdict is Verdict.OK
+    assert rows[0].heard_text == "पाँच छह सात आठ"
+    assert "too short" in rows[0].reason
 
 
 def test_skipped_lines_reason_per_gate() -> None:
