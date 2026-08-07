@@ -219,7 +219,11 @@ def _run_legibility(args: argparse.Namespace) -> int:
 
 def _print_legibility(events: list, worst_n: int | None = None):
     """Print the whole-video legibility grade and its least legible lines."""
-    from subtitle_checker.subtitles.legibility import DEFAULT_WORST_N, video_legibility
+    from subtitle_checker.subtitles.legibility import (
+        BAND_CLEAR,
+        DEFAULT_WORST_N,
+        video_legibility,
+    )
 
     grade = video_legibility(events, worst_n or DEFAULT_WORST_N)
     if grade is None:
@@ -229,7 +233,7 @@ def _print_legibility(events: list, worst_n: int | None = None):
         mins, secs = divmod(int(round(band.seconds)), 60)
         clock = f"{mins}m{secs:02d}s"
         print(f"  {band.label:5s} ({band.share * 100:3.0f}%)  {clock}")
-    low = [line for line in grade.worst if line.score < 100]
+    low = [line for line in grade.worst if line.score < BAND_CLEAR]
     if low:
         print("least legible lines:")
         for line in low:

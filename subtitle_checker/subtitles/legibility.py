@@ -41,7 +41,9 @@ LO_PCT = 5.0
 CONTRAST_FLOOR = 0.15
 CONTRAST_CEIL = 0.65
 
-# How many of the least legible lines to surface for a channel to inspect.
+# How many of the least legible lines to surface for a channel to inspect. Only
+# lines that fall below the Clear band count - a caption that already reads
+# clearly is not a problem to list, even on a short video with few lines.
 DEFAULT_WORST_N = 5
 
 # Readability bands for the time breakdown a channel asked for: how many minutes
@@ -119,8 +121,10 @@ def video_legibility(
     contrast is a pixel measurement, so a band with no readable caption would
     otherwise score the scene behind it, not a subtitle. The grade is the
     duration-weighted mean of the per-line scores - a long low-contrast caption
-    hurts a viewer more than a brief flash - and ``worst`` lists the lowest
-    scorers for inspection. Returns None when no line could be measured.
+    hurts a viewer more than a brief flash - and ``worst`` lists the least
+    legible lines that fall below the Clear band, so a channel only sees captions
+    worth inspecting (empty when every line reads clearly). Returns None when no
+    line could be measured.
     """
     lines = [
         LineLegibility(
@@ -138,7 +142,11 @@ def video_legibility(
 
     weights = [max(line.end - line.start, 1e-6) for line in lines]
     grade = sum(w * line.score for w, line in zip(weights, lines)) / sum(weights)
-    worst = sorted(lines, key=lambda line: line.score)[:worst_n]
+    below_clear = [
+        line for line in sorted(lines, key=lambda line: line.score)
+        if line.score < BAND_CLEAR
+    ]
+    worst = below_clear[:worst_n]
     return VideoLegibility(
         score=round(grade, 1),
         line_count=len(lines),

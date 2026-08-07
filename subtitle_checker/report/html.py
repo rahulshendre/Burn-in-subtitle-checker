@@ -325,9 +325,11 @@ def _legibility_bands_html(leg: VideoLegibility) -> str:
 
 def _legibility_section(leg: VideoLegibility | None, evidence: Evidence) -> str:
     """The least legible lines, so a channel sees exactly which captions fail."""
+    from subtitle_checker.subtitles.legibility import BAND_CLEAR
+
     if leg is None:
         return ""
-    low = [line for line in leg.worst if line.score < 100]
+    low = [line for line in leg.worst if line.score < BAND_CLEAR]
     if not low:
         return ""
     rows = "\n".join(_legibility_row(line, evidence) for line in low)

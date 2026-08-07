@@ -67,6 +67,26 @@ def test_video_legibility_grades_and_surfaces_worst_lines() -> None:
     assert result.worst[0].start == 1  # the least legible line comes first
 
 
+def test_worst_excludes_clear_lines() -> None:
+    # A line that already reads clearly is not surfaced as "least legible", even
+    # when the video has few lines. The list is captions worth inspecting, not a
+    # fixed bottom-N, so a clear line never fills a slot next to a real problem.
+    events = [
+        _event(0, 1, CONTRAST_CEIL),  # score 100 -> Clear
+        _event(1, 2, CONTRAST_FLOOR),  # score 0 -> Poor
+    ]
+    result = video_legibility(events, worst_n=5)
+    assert result is not None
+    assert [round(line.score) for line in result.worst] == [0]
+
+
+def test_worst_empty_when_every_line_is_clear() -> None:
+    events = [_event(0, 1, CONTRAST_CEIL), _event(1, 2, CONTRAST_CEIL)]
+    result = video_legibility(events, worst_n=5)
+    assert result is not None
+    assert result.worst == []
+
+
 def test_unreadable_line_is_not_scored() -> None:
     # A band with bright, high-contrast pixels but no caption OCR could read must
     # not surface a legibility score - contrast would grade the scene, not a line.
