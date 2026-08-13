@@ -7,6 +7,7 @@ from subtitle_checker.subtitles.events import (
     CHROME_PRESENCE,
     CHROME_REGION_PRESENCE,
     chrome_mask,
+    count_text_lines,
     detect_events,
     presence_fields,
     presence_fraction,
@@ -34,6 +35,40 @@ def text_b() -> np.ndarray:
 
 def stream(masks: list[np.ndarray]) -> list[tuple[float, np.ndarray]]:
     return [(i / FPS, m) for i, m in enumerate(masks)]
+
+
+def _bar(lit: np.ndarray, row0: int, row1: int, col0: int, col1: int, n: int) -> None:
+    lit[row0:row1, col0:col1] = n
+
+
+def test_count_text_lines_counts_one_shirorekha_as_one_line() -> None:
+    n = 10
+    lit = np.zeros((20, 100), dtype=np.uint16)
+    _bar(lit, 5, 8, 10, 90, n)  # one wide bar over 80 of 100 columns
+    assert count_text_lines(lit, n) == 1
+
+
+def test_count_text_lines_counts_two_stacked_bars_as_two_lines() -> None:
+    n = 10
+    lit = np.zeros((20, 100), dtype=np.uint16)
+    _bar(lit, 4, 7, 10, 90, n)
+    _bar(lit, 12, 15, 10, 90, n)  # a blank gap between the two bars
+    assert count_text_lines(lit, n) == 2
+
+
+def test_count_text_lines_ignores_sparse_matra_rows() -> None:
+    # The matras above and below a Devanagari bar are sparse - they must not be
+    # counted as their own lines, which would overcount a single caption line.
+    n = 10
+    lit = np.zeros((20, 100), dtype=np.uint16)
+    _bar(lit, 3, 4, 20, 32, n)  # upper matra streak, narrow
+    _bar(lit, 5, 8, 10, 90, n)  # the shirorekha bar
+    _bar(lit, 10, 11, 40, 55, n)  # lower matra streak, narrow
+    assert count_text_lines(lit, n) == 1
+
+
+def test_count_text_lines_none_when_nothing_stable() -> None:
+    assert count_text_lines(np.zeros((20, 100), dtype=np.uint16), 10) is None
 
 
 def test_single_steady_line_is_one_event() -> None:

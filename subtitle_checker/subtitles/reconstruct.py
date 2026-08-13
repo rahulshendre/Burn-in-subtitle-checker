@@ -79,6 +79,7 @@ def reconstruct_subtitles(
                 text=text,
                 confidence=confidence,
                 legibility=contrast(crop),
+                line_count=raw.line_count,
             )
         )
     return subtitles

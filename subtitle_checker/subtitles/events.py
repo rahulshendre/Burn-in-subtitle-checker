@@ -56,6 +56,18 @@ MIN_CLUSTER_STABILITY = 0.5
 # two lines of a wrapped subtitle sit closer than a subtitle sits to a
 # bottom-edge ticker.
 ROW_CLUSTER_GAP = 6
+# Counting stacked subtitle lines within a block (the guideline caps a caption
+# at two). Each Devanagari line carries one shirorekha - the dense horizontal
+# top bar every word hangs from - which is the tallest peak in the row
+# projection, while the matras above and below it are sparser. Counting peaks,
+# not generic lit rows, avoids splitting one line's upper-matra / body /
+# lower-matra bands into three. A row is part of a bar when its lit-pixel count
+# reaches SHIRO_PEAK_FRAC of the block's tallest row; peak runs separated by more
+# than LINE_ROW_GAP rows (the blank inter-line gap) are separate lines. Measuring
+# each peak against the block's own maximum keeps word spacing - which dilutes an
+# absolute width test - from dropping a real bar.
+SHIRO_PEAK_FRAC = 0.6
+LINE_ROW_GAP = 2
 
 
 @dataclass
@@ -68,6 +80,9 @@ class RawEvent:
     # (row0, row1, col0, col1) - lets OCR crop to the text and ignore the
     # bright scenery around it
     bbox: tuple[int, int, int, int] | None = None
+    # how many text lines are stacked in the block (1 or 2 for a subtitle),
+    # None when nothing stable was measured - a guideline-compliance signal
+    line_count: int | None = None
 
     @property
     def mid(self) -> float:
@@ -82,20 +97,18 @@ def _mask_bbox(mask: np.ndarray) -> tuple[int, int, int, int] | None:
     return int(rows[0]), int(rows[-1]) + 1, int(cols[0]), int(cols[-1]) + 1
 
 
-def _stable_text_bbox(
-    lit_frames: np.ndarray, frame_count: int
-) -> tuple[int, int, int, int] | None:
-    """Bounding box of the event's own text, from its per-pixel lit counts.
+def _stable_text_mask(lit_frames: np.ndarray, frame_count: int) -> np.ndarray:
+    """The event's own stable text pixels, scrolling tickers removed.
 
-    Splits the ever-lit rows into horizontal blocks, drops blocks that were
-    mostly transient (scrolling tickers), and boxes the stable pixels of
-    what remains.
+    Splits the ever-lit rows into horizontal blocks and drops blocks that were
+    mostly transient (a scrolling ticker leaks only a couple of stable streaks),
+    keeping the stable pixels of what remains.
     """
     stable = lit_frames >= max(frame_count * STABLE_PIXEL_FRACTION, 1)
     union = lit_frames > 0
     rows = np.flatnonzero(union.any(axis=1))
     if rows.size == 0:
-        return None
+        return np.zeros_like(stable)
     keep = np.zeros(union.shape[0], dtype=bool)
     splits = np.flatnonzero(np.diff(rows) > ROW_CLUSTER_GAP)
     for cluster in np.split(rows, splits + 1):
@@ -103,8 +116,33 @@ def _stable_text_bbox(
         lit = int(union[r0:r1].sum())
         if lit and stable[r0:r1].sum() / lit >= MIN_CLUSTER_STABILITY:
             keep[r0:r1] = True
-    masked = np.logical_and(stable, keep[:, None])
-    return _mask_bbox(masked) or _mask_bbox(stable) or _mask_bbox(union)
+    return np.logical_and(stable, keep[:, None])
+
+
+def _stable_text_bbox(
+    lit_frames: np.ndarray, frame_count: int
+) -> tuple[int, int, int, int] | None:
+    """Bounding box of the event's own text, from its per-pixel lit counts."""
+    stable = lit_frames >= max(frame_count * STABLE_PIXEL_FRACTION, 1)
+    masked = _stable_text_mask(lit_frames, frame_count)
+    return _mask_bbox(masked) or _mask_bbox(stable) or _mask_bbox(lit_frames > 0)
+
+
+def count_text_lines(lit_frames: np.ndarray, frame_count: int) -> int | None:
+    """Number of stacked text lines in the event, from its row projection.
+
+    A wrapped subtitle stacks one or two lines; the guideline caps it at two.
+    Counts bands of text rows separated by blank rows in the event's stable text
+    mask. Returns None when no stable text was measured.
+    """
+    masked = _stable_text_mask(lit_frames, frame_count)
+    row_lit = masked.sum(axis=1)
+    peak = int(row_lit.max())
+    if peak == 0:
+        return None
+    bars = np.flatnonzero(row_lit >= peak * SHIRO_PEAK_FRAC)
+    splits = np.flatnonzero(np.diff(bars) > LINE_ROW_GAP)
+    return len(np.split(bars, splits + 1))
 
 
 def presence_fraction(masks: Iterable[np.ndarray]) -> np.ndarray:
@@ -196,7 +234,10 @@ def detect_events(
         nonlocal current_start, reference, lit_frames, frame_count
         if current_start is not None and end - current_start >= min_event_s:
             bbox = _stable_text_bbox(lit_frames, frame_count)
-            events.append(RawEvent(start=current_start, end=end, bbox=bbox))
+            lines = count_text_lines(lit_frames, frame_count)
+            events.append(
+                RawEvent(start=current_start, end=end, bbox=bbox, line_count=lines)
+            )
         current_start, reference, lit_frames, frame_count = None, None, None, 0
 
     for t, mask in frames:
