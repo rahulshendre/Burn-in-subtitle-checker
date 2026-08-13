@@ -9,11 +9,13 @@ explicit about the ones it cannot.
 ## What the tool checks
 
 - **Characters on screen: up to 70** (two lines of 35). Counted from the OCR
-  text of each subtitle. This is the reliable signal - it also caps how much
-  text is on screen, so a caption carrying too much still gets caught here.
-- **Lines on screen: up to 2.** Counted from the subtitle's shape on the frame.
-  Best-effort: line counting from burned pixels is not dependable across every
-  render, so the character budget above is the primary gate.
+  text of each subtitle. This is the pass/fail gate - a reliable signal that also
+  caps how much text is on screen, so a caption carrying too much gets caught
+  here.
+- **Lines on screen** are also measured from the subtitle's shape, but only for
+  information. Counting lines from burned pixels is not dependable across every
+  render, so a caption is never failed on the line count - the character budget
+  above already limits how much text can sit on screen.
 
 The result is shown as a **Guideline compliance** score in the HTML report,
 next to the legibility grade: "X of Y lines follow the guidelines".

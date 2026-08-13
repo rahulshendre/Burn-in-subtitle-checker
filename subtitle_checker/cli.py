@@ -247,7 +247,6 @@ def _print_compliance(events: list):
     """Print how many subtitle lines follow the checkable guideline caps."""
     from subtitle_checker.subtitles.compliance import (
         MAX_CHARS_ON_SCREEN,
-        MAX_LINES,
         check_compliance,
     )
 
@@ -259,7 +258,6 @@ def _print_compliance(events: list):
         f"({comp.share * 100:.0f}%)"
     )
     print(f"  <={MAX_CHARS_ON_SCREEN} chars on screen: {comp.chars_pass}/{comp.chars_measured}")
-    print(f"  <={MAX_LINES} lines on screen: {comp.lines_pass}/{comp.lines_measured}")
     for v in sorted(comp.violations, key=lambda v: v.start):
         text = v.text or "<unreadable>"
         print(f"  {v.start:7.2f}-{v.end:7.2f}  {'; '.join(v.failures())}  {text}")

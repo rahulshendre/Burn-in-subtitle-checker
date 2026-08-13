@@ -35,11 +35,14 @@ def test_two_line_caption_within_the_on_screen_budget_passes() -> None:
     assert line.compliant
 
 
-def test_three_lines_break_the_line_cap() -> None:
+def test_line_count_is_recorded_but_does_not_fail_compliance() -> None:
+    # Line counting from burned pixels is not reliable enough to fail a caption
+    # on. A short caption stays compliant even if the mask over-counts its lines;
+    # the character budget is the pass/fail gate.
     line = line_compliance(_event("क" * 10, line_count=3))
-    assert line.lines_ok is False
-    assert not line.compliant
-    assert "lines on screen" in line.failures()[0]
+    assert line.lines_ok is False  # the cap is still evaluated, for information
+    assert line.compliant  # but it does not fail the line
+    assert line.failures() == []
 
 
 def test_unmeasured_line_count_makes_no_claim_on_lines() -> None:
@@ -59,14 +62,15 @@ def test_check_compliance_counts_and_lists_violations() -> None:
     events = [
         _event("हम सब", line_count=1),  # compliant
         _event("क" * (MAX_CHARS_ON_SCREEN + 10), line_count=2),  # too many characters
-        _event("ख" * 10, line_count=3),  # too many lines
+        _event("ख" * 10, line_count=3),  # over-counted lines, still compliant (chars ok)
         _event("", line_count=1),  # unreadable - not graded
     ]
     comp = check_compliance(events)
     assert comp is not None
     assert comp.graded == 3
-    assert comp.compliant == 1
+    assert comp.compliant == 2  # only the over-length caption fails
     assert comp.chars_pass == 2 and comp.chars_measured == 3
-    assert comp.lines_pass == 2 and comp.lines_measured == 3
-    assert len(comp.violations) == 2
-    assert round(comp.share, 3) == round(1 / 3, 3)
+    assert comp.lines_pass == 2 and comp.lines_measured == 3  # measured, not gated on
+    assert len(comp.violations) == 1
+    assert comp.violations[0].char_count == MAX_CHARS_ON_SCREEN + 10
+    assert round(comp.share, 3) == round(2 / 3, 3)

@@ -8,17 +8,16 @@ cannot recover a point size or a font name after the fact. Two rules, though, ar
 measurable straight off the frame - how many characters a line holds, and how
 many lines stack on screen - and those are exactly the ones an editor slips on.
 
-This grades each readable subtitle against those two caps and reports how many
-lines follow the standard, so a channel gets a concrete pass/fail against its own
-guidelines instead of a subjective read.
+This grades each readable subtitle and reports how many follow the standard, so a
+channel gets a concrete pass/fail against its own guidelines instead of a
+subjective read.
 
-The line count is measured from the subtitle mask (the OCR text joins wrapped
-lines into one string, so it cannot be split back into visual lines), and drives
-the two-lines-on-screen cap. The character cap is checked against the whole
-caption's on-screen budget - two lines at the per-line limit - rather than per
-visual line: recovering the exact wrap point of a burned-in caption from pixels
-is not reliable, so the tool checks the total it can measure well instead of
-guessing a split it cannot.
+The pass/fail rests on the character count, checked against the whole caption's
+on-screen budget - two lines at the per-line limit (70). That is the reliable
+signal, read straight from the OCR text, and it already caps how much text can
+sit on screen. The line count is also measured from the subtitle mask and kept
+for information, but counting lines from burned pixels is not dependable across
+every render, so a caption is never failed on it.
 """
 
 from __future__ import annotations
@@ -51,17 +50,20 @@ class LineCompliance:
 
     @property
     def compliant(self) -> bool:
-        """True unless a measured check failed - an unmeasured check makes no claim."""
-        return self.chars_ok is not False and self.lines_ok is not False
+        """True when the character count is within budget.
+
+        Compliance rests on the character count alone - the reliable signal read
+        from the OCR text. The mask-based line count is kept for information but
+        is not dependable enough across renders to fail a caption on, and the
+        character budget already caps how much text sits on screen.
+        """
+        return self.chars_ok is not False
 
     def failures(self) -> list[str]:
         """Human-readable reasons this line breaks the guidelines, if any."""
-        reasons = []
-        if self.lines_ok is False:
-            reasons.append(f"{self.line_count} lines on screen (max {MAX_LINES})")
         if self.chars_ok is False:
-            reasons.append(f"{self.char_count} characters (max {MAX_CHARS_ON_SCREEN})")
-        return reasons
+            return [f"{self.char_count} characters (max {MAX_CHARS_ON_SCREEN})"]
+        return []
 
 
 @dataclass

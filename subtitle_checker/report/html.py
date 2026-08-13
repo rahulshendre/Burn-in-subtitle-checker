@@ -374,8 +374,6 @@ def _compliance_banner(comp: VideoCompliance | None) -> str:
         f"<li>Up to {MAX_CHARS_ON_SCREEN} characters on screen "
         f"({MAX_LINES} lines &times; {MAX_CHARS_PER_LINE}): "
         f"<strong>{comp.chars_pass}/{comp.chars_measured}</strong> lines pass</li>"
-        f"<li>At most {MAX_LINES} lines on screen: "
-        f"<strong>{comp.lines_pass}/{comp.lines_measured}</strong> lines pass</li>"
     )
     return (
         '<section class="compliance"><h2>Guideline compliance</h2>'
@@ -384,10 +382,10 @@ def _compliance_banner(comp: VideoCompliance | None) -> str:
         '<div class="leg-caption">'
         f'<p class="leg-headline">{comp.compliant} of {comp.graded} '
         "lines follow the guidelines</p>"
-        '<p class="note">Checked against the two guideline rules a burned-in frame '
-        "shows: characters on screen and lines on screen. Font, point size and "
-        "spacing are set when the subtitles are authored and cannot be read back "
-        "from the finished video.</p></div></div>"
+        '<p class="note">Checked against the guideline rule a burned-in frame '
+        "shows reliably: characters on screen (up to two lines at the per-line "
+        "cap). Font, point size and spacing are set when the subtitles are "
+        "authored and cannot be read back from the finished video.</p></div></div>"
         f'<ul class="compliance-rules">{rules}</ul>'
         f"{_compliance_violations(comp)}"
         "</section>"
