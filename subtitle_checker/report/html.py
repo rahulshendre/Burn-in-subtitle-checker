@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Protocol
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
 
 if TYPE_CHECKING:
+    from subtitle_checker.subtitles.compliance import VideoCompliance
     from subtitle_checker.subtitles.legibility import VideoLegibility
 
 
@@ -80,6 +81,7 @@ def render_report(
     generated: str | None = None,
     skipped: list[tuple[SubtitleEvent, str]] | None = None,
     legibility: VideoLegibility | None = None,
+    compliance: VideoCompliance | None = None,
 ) -> str:
     """Render check results into one self-contained HTML document.
 
@@ -102,6 +104,7 @@ def render_report(
         _head(title),
         _summary(title, results, stamp),
         _legibility_banner(legibility),
+        _compliance_banner(compliance),
         _flags_section(flags, evidence),
         _ledger_section(oks, evidence),
         _legibility_section(legibility, evidence),
@@ -352,6 +355,59 @@ def _legibility_row(line, evidence: Evidence) -> str:
         f'<tr><td class="tspan">{_ts(line.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{text}</td>'
         f'<td class="score-cell" style="color:{color}">{line.score:.0f}</td></tr>'
+    )
+
+
+def _compliance_banner(comp: VideoCompliance | None) -> str:
+    """How many subtitle lines follow the checkable guideline caps."""
+    if comp is None or comp.graded == 0:
+        return ""
+    from subtitle_checker.subtitles.compliance import (
+        MAX_CHARS_ON_SCREEN,
+        MAX_CHARS_PER_LINE,
+        MAX_LINES,
+    )
+
+    pct = comp.share * 100
+    color = _legibility_color(pct)
+    rules = (
+        f"<li>Up to {MAX_CHARS_ON_SCREEN} characters on screen "
+        f"({MAX_LINES} lines &times; {MAX_CHARS_PER_LINE}): "
+        f"<strong>{comp.chars_pass}/{comp.chars_measured}</strong> lines pass</li>"
+        f"<li>At most {MAX_LINES} lines on screen: "
+        f"<strong>{comp.lines_pass}/{comp.lines_measured}</strong> lines pass</li>"
+    )
+    return (
+        '<section class="compliance"><h2>Guideline compliance</h2>'
+        '<div class="leg-grade">'
+        f'<span class="leg-score" style="color:{color}">{pct:.0f}<small>%</small></span>'
+        '<div class="leg-caption">'
+        f'<p class="leg-headline">{comp.compliant} of {comp.graded} '
+        "lines follow the guidelines</p>"
+        '<p class="note">Checked against the two guideline rules a burned-in frame '
+        "shows: characters on screen and lines on screen. Font, point size and "
+        "spacing are set when the subtitles are authored and cannot be read back "
+        "from the finished video.</p></div></div>"
+        f'<ul class="compliance-rules">{rules}</ul>'
+        f"{_compliance_violations(comp)}"
+        "</section>"
+    )
+
+
+def _compliance_violations(comp: VideoCompliance) -> str:
+    """A table of the lines that break a guideline cap, with the reason."""
+    if not comp.violations:
+        return '<p class="note">Every graded line follows the guidelines.</p>'
+    rows = "\n".join(
+        f'<tr><td class="tspan">{_ts(v.start)}</td>'
+        f'<td class="deva">{html.escape(v.text) or "-"}</td>'
+        f'<td>{html.escape("; ".join(v.failures()))}</td></tr>'
+        for v in sorted(comp.violations, key=lambda v: v.start)
+    )
+    return (
+        "<table><thead><tr><th>Time</th><th>Subtitle (OCR read)</th>"
+        "<th>Breaks the guideline</th></tr></thead><tbody>"
+        f"{rows}</tbody></table>"
     )
 
 

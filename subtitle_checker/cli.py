@@ -195,6 +195,7 @@ def _run_check(args: argparse.Namespace) -> int:
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
 
     _print_legibility(events)
+    _print_compliance(events)
     _run_audio_checks(video, events, out_dir, args.lang, args.asr)
     return 0
 
@@ -242,6 +243,29 @@ def _print_legibility(events: list, worst_n: int | None = None):
     return grade
 
 
+def _print_compliance(events: list):
+    """Print how many subtitle lines follow the checkable guideline caps."""
+    from subtitle_checker.subtitles.compliance import (
+        MAX_CHARS_ON_SCREEN,
+        MAX_LINES,
+        check_compliance,
+    )
+
+    comp = check_compliance(events)
+    if comp is None:
+        return None
+    print(
+        f"\nguideline compliance: {comp.compliant}/{comp.graded} lines "
+        f"({comp.share * 100:.0f}%)"
+    )
+    print(f"  <={MAX_CHARS_ON_SCREEN} chars on screen: {comp.chars_pass}/{comp.chars_measured}")
+    print(f"  <={MAX_LINES} lines on screen: {comp.lines_pass}/{comp.lines_measured}")
+    for v in sorted(comp.violations, key=lambda v: v.start):
+        text = v.text or "<unreadable>"
+        print(f"  {v.start:7.2f}-{v.end:7.2f}  {'; '.join(v.failures())}  {text}")
+    return comp
+
+
 def _run_report(args: argparse.Namespace) -> int:
     video = _require_video(args.video)
     if video is None:
@@ -263,9 +287,11 @@ def _run_report(args: argparse.Namespace) -> int:
     out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
     skipped = _load_skipped(results_path, video, results)
     legibility = _load_legibility(results_path, video)
+    compliance = _load_compliance(results_path, video)
     write_report(
         video, results, out,
-        title=_report_title(video), skipped=skipped, legibility=legibility,
+        title=_report_title(video), skipped=skipped,
+        legibility=legibility, compliance=compliance,
     )
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
@@ -280,6 +306,17 @@ def _load_legibility(results_path: Path, video: Path) -> object | None:
     if not events_path.exists():
         return None
     return video_legibility(load_artifact(events_path)[1])
+
+
+def _load_compliance(results_path: Path, video: Path) -> object | None:
+    """Grade guideline compliance from the sibling events artifact when it exists."""
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.subtitles.compliance import check_compliance
+
+    events_path = _sibling_artifact(results_path, video, "subtitle_events")
+    if not events_path.exists():
+        return None
+    return check_compliance(load_artifact(events_path)[1])
 
 
 def _load_skipped(results_path: Path, video: Path, results: list) -> list | None:
@@ -336,6 +373,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
     from subtitle_checker.match.asr import skipped_lines
+    from subtitle_checker.subtitles.compliance import check_compliance
     from subtitle_checker.subtitles.legibility import video_legibility
 
     _print_flags(results)
@@ -343,6 +381,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
         video, results, out_dir,
         skipped=skipped_lines(events, results, regions),
         legibility=video_legibility(events),
+        compliance=check_compliance(events),
     )
 
 
@@ -412,13 +451,15 @@ def _write_report(
     out_dir: Path,
     skipped: list | None = None,
     legibility: object | None = None,
+    compliance: object | None = None,
 ) -> None:
     from subtitle_checker.report.evidence import write_report
 
     path = out_dir / f"{video.stem}_report.html"
     write_report(
         video, results, path,
-        title=_report_title(video), skipped=skipped, legibility=legibility,
+        title=_report_title(video), skipped=skipped,
+        legibility=legibility, compliance=compliance,
     )
     print(f"report -> {path}")
 

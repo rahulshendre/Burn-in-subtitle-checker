@@ -72,12 +72,13 @@ def write_report(
     generated: str | None = None,
     skipped: list[tuple[SubtitleEvent, str]] | None = None,
     legibility: object | None = None,
+    compliance: object | None = None,
 ) -> Path:
     """Render ``results`` against ``video`` and write a self-contained HTML file."""
     evidence = FfmpegEvidence(video)
     document = render_report(
         results, evidence, title=title or video.stem, generated=generated,
-        skipped=skipped, legibility=legibility,
+        skipped=skipped, legibility=legibility, compliance=compliance,
     )
     out_path.write_text(document, encoding="utf-8")
     return out_path
