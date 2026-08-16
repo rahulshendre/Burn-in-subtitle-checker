@@ -7,6 +7,8 @@ from subtitle_checker.subtitles.legibility import (
     CONTRAST_CEIL,
     CONTRAST_FLOOR,
     contrast,
+    legibility_ratio,
+    line_height_frac,
     line_score,
     video_legibility,
 )
@@ -85,6 +87,35 @@ def test_worst_empty_when_every_line_is_clear() -> None:
     result = video_legibility(events, worst_n=5)
     assert result is not None
     assert result.worst == []
+
+
+def test_legibility_ratio_high_for_white_on_dark() -> None:
+    # White strokes on a dark scene clear the broadcast 5:1 easily.
+    ratio = legibility_ratio(_crop(background=20, text=250))
+    assert ratio is not None and ratio > 5.0
+
+
+def test_legibility_ratio_low_for_text_over_a_bright_scene() -> None:
+    # Bright text over a mid-bright background barely separates: below 5:1.
+    ratio = legibility_ratio(_crop(background=160, text=205))
+    assert ratio is not None and ratio < 2.5
+
+
+def test_legibility_ratio_none_without_a_stroke_and_background_split() -> None:
+    assert legibility_ratio(np.full((40, 40), 200, dtype=np.uint8)) is None
+    assert legibility_ratio(np.empty((0, 0), dtype=np.uint8)) is None
+
+
+def test_line_height_frac_is_per_line_and_frame_relative() -> None:
+    # A 30-row-tall text block over two lines in a 480px frame -> 15px/line.
+    crop = np.full((100, 100), 20, dtype=np.uint8)
+    crop[10:40, 10:90] = 250
+    frac = line_height_frac(crop, line_count=2, frame_h=480)
+    assert frac is not None and abs(frac - (15 / 480)) < 1e-3
+
+
+def test_line_height_frac_none_when_no_text() -> None:
+    assert line_height_frac(np.full((40, 40), 20, dtype=np.uint8), 1, 480) is None
 
 
 def test_unreadable_line_is_not_scored() -> None:

@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from subtitle_checker.artifacts import SubtitleEvent
+from subtitle_checker.subtitles.masks import binarize, text_mask
 
 # Percentiles standing in for the text strokes (high) and the local background
 # (low). Robust ends, not min/max, so one speck of glare or shadow cannot swing
@@ -76,6 +77,71 @@ def line_score(c: float) -> float:
     span = CONTRAST_CEIL - CONTRAST_FLOOR
     frac = (c - CONTRAST_FLOOR) / span
     return round(100 * min(1.0, max(0.0, frac)), 1)
+
+
+# Diagnostic factors behind the score - not part of the grade, but what a channel
+# needs to know *why* a line reads poorly and how to fix it. Two factors carry
+# the signal (calibrated on real Hindi footage: guideline clips vs low originals);
+# background clutter was measured too and did not track legibility, so it is left
+# out. The Michelson score above stays the grade; these only drive recommendations.
+#
+# WCAG relative-luminance contrast ratio, stroke pixels vs background. Broadcast
+# (BBC) asks 5:1; below ~3:1 a white line over a bright scene is genuinely hard.
+# Measured: guideline clips ~5.6-5.8:1, low originals ~2.7-3.2:1.
+CONTRAST_RATIO_GOOD = 5.0
+# Per-line text height as a fraction of frame height. The broadcast rule of thumb
+# is ~8% line height (16:9); measured guideline clips run 6-7%, cramped multi-line
+# originals ~4%. Below the target the text is small enough to slow a reader.
+LINE_HEIGHT_GOOD = 0.06
+
+# sRGB values at or below this are linearised by a plain divide, not the power
+# curve (the WCAG piecewise transfer function).
+_SRGB_LINEAR_CUTOFF = 0.03928
+
+
+def legibility_ratio(crop: np.ndarray) -> float | None:
+    """WCAG relative-luminance contrast ratio of the text strokes vs background.
+
+    The bright text pixels (the binarised stroke mask) against the rest of the
+    crop, as the standard ``(L_light + 0.05) / (L_dark + 0.05)`` on linearised
+    luminance. Grayscale stands in for luminance - the band is sampled gray, and
+    gray is itself a luma projection. Returns None when the crop has no clear
+    stroke-and-background split to compare (all bright or all dark).
+    """
+    if crop.size == 0:
+        return None
+    stroke = binarize(crop)
+    if stroke.sum() < 10 or (~stroke).sum() < 10:
+        return None
+    gray = crop.astype(np.float64) / 255.0
+    lin = np.where(
+        gray <= _SRGB_LINEAR_CUTOFF, gray / 12.92, ((gray + 0.055) / 1.055) ** 2.4
+    )
+    text = float(lin[stroke].mean())
+    background = float(lin[~stroke].mean())
+    hi, lo = max(text, background), min(text, background)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _text_block_px(crop: np.ndarray) -> int:
+    """Native-pixel height of the text block in the crop (stroke rows extent)."""
+    mask = text_mask(crop)
+    rows = np.where(mask.any(axis=1))[0]
+    return int(rows[-1] - rows[0] + 1) if rows.size else 0
+
+
+def line_height_frac(crop: np.ndarray, line_count: int, frame_h: float) -> float | None:
+    """Per-line text height as a fraction of the frame height.
+
+    The text block spans ``line_count`` stacked lines, so its height is divided
+    back out to a single line, then taken relative to the full frame height - a
+    resolution- and aspect-independent measure of how large the caption renders.
+    Returns None when nothing was measurable.
+    """
+    px = _text_block_px(crop)
+    if px == 0 or frame_h <= 0:
+        return None
+    return (px / max(line_count, 1)) / frame_h
 
 
 @dataclass

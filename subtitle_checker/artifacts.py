@@ -46,6 +46,8 @@ class SubtitleEvent:
     confidence: float = 1.0
     legibility: float | None = None  # text-vs-background contrast 0..1 (None = unmeasured)
     line_count: int | None = None  # stacked text lines on screen (None = unmeasured)
+    legibility_ratio: float | None = None  # WCAG luminance contrast ratio, stroke vs bg
+    line_height_frac: float | None = None  # per-line text height / frame height (None = unmeasured)
 
 
 @dataclass

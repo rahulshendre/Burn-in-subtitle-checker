@@ -19,7 +19,11 @@ from subtitle_checker.subtitles.events import (
     detect_events,
     presence_fields,
 )
-from subtitle_checker.subtitles.legibility import contrast
+from subtitle_checker.subtitles.legibility import (
+    contrast,
+    legibility_ratio,
+    line_height_frac,
+)
 from subtitle_checker.subtitles.masks import text_mask
 from subtitle_checker.subtitles.ocr import EasyOcrEngine, OcrEngine
 from subtitle_checker.subtitles.sampler import (
@@ -72,6 +76,9 @@ def reconstruct_subtitles(
         band = extract_band_frame(video, raw.mid, band_top)
         crop = _crop_to_text(band, raw.bbox)
         text, confidence = engine.read(crop)
+        # extract_band_frame returns the band below band_top, so the full frame
+        # height is the band's height scaled back up by the fraction it covers.
+        frame_h = band.shape[0] / (1.0 - band_top) if band_top < 1.0 else band.shape[0]
         subtitles.append(
             SubtitleEvent(
                 start=raw.start,
@@ -80,6 +87,8 @@ def reconstruct_subtitles(
                 confidence=confidence,
                 legibility=contrast(crop),
                 line_count=raw.line_count,
+                legibility_ratio=legibility_ratio(crop),
+                line_height_frac=line_height_frac(crop, raw.line_count or 1, frame_h),
             )
         )
     return subtitles
