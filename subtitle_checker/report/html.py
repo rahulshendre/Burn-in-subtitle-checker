@@ -82,6 +82,7 @@ def render_report(
     skipped: list[tuple[SubtitleEvent, str]] | None = None,
     legibility: VideoLegibility | None = None,
     compliance: VideoCompliance | None = None,
+    recommendations: list | None = None,
 ) -> str:
     """Render check results into one self-contained HTML document.
 
@@ -108,6 +109,7 @@ def render_report(
         _flags_section(flags, evidence),
         _ledger_section(oks, evidence),
         _legibility_section(legibility, evidence),
+        _recommendations_section(recommendations),
         _skipped_section(sorted(skipped or [], key=lambda s: s[0].start), evidence),
         _foot(),
     ]
@@ -355,6 +357,33 @@ def _legibility_row(line, evidence: Evidence) -> str:
         f'<tr><td class="tspan">{_ts(line.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{text}</td>'
         f'<td class="score-cell" style="color:{color}">{line.score:.0f}</td></tr>'
+    )
+
+
+def _recommendations_section(advice: list | None) -> str:
+    """Actionable fixes for the below-Clear lines - how to raise legibility."""
+    from subtitle_checker.subtitles.recommend import advice_summary
+
+    if not advice:
+        return ""
+    rows = []
+    for a in advice:
+        text = html.escape(a.text.strip()) or '<em class="none">- unreadable -</em>'
+        tips = "".join(f"<li>{html.escape(tip)}</li>" for tip in a.tips)
+        rows.append(
+            f'<tr><td class="tspan">{_ts(a.start)}</td>'
+            f'<td class="deva">{text}</td>'
+            f'<td><ul class="tips">{tips}</ul></td></tr>'
+        )
+    body = "\n".join(rows)
+    return (
+        '<section class="leg-advice"><h2>How to improve legibility</h2>'
+        f'<p class="note">{html.escape(advice_summary(advice) or "")} These are '
+        "measured, fixable causes - contrast against the background and on-screen "
+        "text size - for the lines that read below Clear.</p>"
+        "<table><thead><tr><th>Time</th><th>Subtitle (OCR read)</th>"
+        "<th>Suggested fix</th></tr></thead><tbody>"
+        f"{body}</tbody></table></section>"
     )
 
 

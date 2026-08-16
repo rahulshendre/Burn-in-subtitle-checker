@@ -240,7 +240,23 @@ def _print_legibility(events: list, worst_n: int | None = None):
         for line in low:
             text = line.text.strip() or "<unreadable>"
             print(f"  {line.score:5.0f}  {line.start:7.2f}-{line.end:7.2f}  {text}")
+    _print_recommendations(events)
     return grade
+
+
+def _print_recommendations(events: list) -> None:
+    """Print the actionable fixes for below-Clear lines, when any apply."""
+    from subtitle_checker.subtitles.recommend import advice_summary, legibility_advice
+
+    advice = legibility_advice(events)
+    if not advice:
+        return
+    print(f"how to improve legibility: {advice_summary(advice)}")
+    for a in advice:
+        text = a.text.strip() or "<unreadable>"
+        print(f"  {a.start:7.2f}-{a.end:7.2f}  {text}")
+        for tip in a.tips:
+            print(f"      - {tip}")
 
 
 def _print_compliance(events: list):
@@ -286,10 +302,12 @@ def _run_report(args: argparse.Namespace) -> int:
     skipped = _load_skipped(results_path, video, results)
     legibility = _load_legibility(results_path, video)
     compliance = _load_compliance(results_path, video)
+    recommendations = _load_recommendations(results_path, video)
     write_report(
         video, results, out,
         title=_report_title(video), skipped=skipped,
         legibility=legibility, compliance=compliance,
+        recommendations=recommendations,
     )
     print(f"report -> {out}  ({len(results)} row(s))")
     return 0
@@ -304,6 +322,17 @@ def _load_legibility(results_path: Path, video: Path) -> object | None:
     if not events_path.exists():
         return None
     return video_legibility(load_artifact(events_path)[1])
+
+
+def _load_recommendations(results_path: Path, video: Path) -> list | None:
+    """Rebuild legibility recommendations from the sibling events artifact."""
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.subtitles.recommend import legibility_advice
+
+    events_path = _sibling_artifact(results_path, video, "subtitle_events")
+    if not events_path.exists():
+        return None
+    return legibility_advice(load_artifact(events_path)[1])
 
 
 def _load_compliance(results_path: Path, video: Path) -> object | None:
@@ -373,6 +402,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     from subtitle_checker.match.asr import skipped_lines
     from subtitle_checker.subtitles.compliance import check_compliance
     from subtitle_checker.subtitles.legibility import video_legibility
+    from subtitle_checker.subtitles.recommend import legibility_advice
 
     _print_flags(results)
     _write_report(
@@ -380,6 +410,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
         skipped=skipped_lines(events, results, regions),
         legibility=video_legibility(events),
         compliance=check_compliance(events),
+        recommendations=legibility_advice(events),
     )
 
 
@@ -450,6 +481,7 @@ def _write_report(
     skipped: list | None = None,
     legibility: object | None = None,
     compliance: object | None = None,
+    recommendations: list | None = None,
 ) -> None:
     from subtitle_checker.report.evidence import write_report
 
@@ -458,6 +490,7 @@ def _write_report(
         video, results, path,
         title=_report_title(video), skipped=skipped,
         legibility=legibility, compliance=compliance,
+        recommendations=recommendations,
     )
     print(f"report -> {path}")
 
