@@ -56,6 +56,12 @@ SARVAM_URL = "https://api.sarvam.ai/speech-to-text"
 # which is what we compare against the burned-in subtitle.
 SARVAM_MODEL = "saaras:v3"
 SARVAM_MODE = "transcribe"
+# The sync endpoint rate-limits a fast burst of per-line calls with a 429. A long
+# clip has dozens of lines, so a naive loop trips it and crashes the run mid-way.
+# Back off and retry instead: honour the server's Retry-After when it sends one,
+# else exponential backoff. A 429 that survives every retry still raises.
+SARVAM_MAX_RETRIES = 5
+SARVAM_BACKOFF_S = 2.0
 
 
 class AsrEngine(Protocol):
@@ -76,24 +82,44 @@ class SarvamAsr:
         self._lang = lang
 
     def transcribe(self, audio: np.ndarray) -> str:
+        import time
+
         import requests
 
         key = os.environ.get("SARVAM_API_KEY")
         if not key:
             raise RuntimeError("SARVAM_API_KEY not set in the environment")
-        resp = requests.post(
-            SARVAM_URL,
-            headers={"api-subscription-key": key},
-            files={"file": ("audio.wav", _to_wav(audio), "audio/wav")},
-            data={
-                "model": SARVAM_MODEL,
-                "mode": SARVAM_MODE,
-                "language_code": self._lang,
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return resp.json().get("transcript", "").strip()
+        wav = _to_wav(audio).getvalue()
+        for attempt in range(SARVAM_MAX_RETRIES + 1):
+            resp = requests.post(
+                SARVAM_URL,
+                headers={"api-subscription-key": key},
+                # Rebuild the file object each attempt - the previous POST consumed it.
+                files={"file": ("audio.wav", io.BytesIO(wav), "audio/wav")},
+                data={
+                    "model": SARVAM_MODEL,
+                    "mode": SARVAM_MODE,
+                    "language_code": self._lang,
+                },
+                timeout=120,
+            )
+            if resp.status_code == 429 and attempt < SARVAM_MAX_RETRIES:
+                time.sleep(_retry_after(resp, attempt))
+                continue
+            resp.raise_for_status()
+            return resp.json().get("transcript", "").strip()
+        raise AssertionError("unreachable")  # loop returns or raises every path
+
+
+def _retry_after(resp: object, attempt: int) -> float:
+    """Seconds to wait before retrying a 429 - server's Retry-After, else backoff."""
+    header = getattr(resp, "headers", {}).get("Retry-After")
+    if header:
+        try:
+            return float(header)
+        except ValueError:
+            pass
+    return SARVAM_BACKOFF_S * (2**attempt)
 
 
 def _to_wav(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> io.BytesIO:

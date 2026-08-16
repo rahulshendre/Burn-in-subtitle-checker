@@ -146,3 +146,63 @@ def test_to_wav_is_valid_pcm() -> None:
         assert w.getnchannels() == 1
         assert w.getsampwidth() == 2
         assert w.getnframes() == 1600
+
+
+class _Resp:
+    def __init__(self, status: int, headers: dict | None = None) -> None:
+        self.status_code = status
+        self.headers = headers or {}
+
+    def raise_for_status(self) -> None:
+        import requests
+
+        if self.status_code >= 400:
+            raise requests.HTTPError(str(self.status_code))
+
+    def json(self) -> dict:
+        return {"transcript": " नमस्ते "}
+
+
+def test_sarvam_retries_on_429_then_succeeds(monkeypatch) -> None:
+    import requests
+
+    from subtitle_checker.match.asr import SarvamAsr
+
+    calls = {"n": 0}
+    slept: list[float] = []
+
+    def fake_post(*_args, **_kwargs) -> _Resp:
+        calls["n"] += 1
+        return _Resp(429 if calls["n"] < 3 else 200)
+
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr("time.sleep", lambda s: slept.append(s))
+
+    assert SarvamAsr().transcribe(np.zeros(1600, dtype=np.float32)) == "नमस्ते"
+    assert calls["n"] == 3  # two 429s retried, third succeeded
+    assert len(slept) == 2
+
+
+def test_sarvam_raises_after_exhausting_retries(monkeypatch) -> None:
+    import requests
+
+    from subtitle_checker.match.asr import SarvamAsr
+
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    monkeypatch.setattr(requests, "post", lambda *a, **k: _Resp(429))
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    try:
+        SarvamAsr().transcribe(np.zeros(1600, dtype=np.float32))
+    except requests.HTTPError as exc:
+        assert "429" in str(exc)
+    else:
+        raise AssertionError("expected HTTPError after retries exhausted")
+
+
+def test_retry_after_honours_header_then_backoff() -> None:
+    from subtitle_checker.match.asr import SARVAM_BACKOFF_S, _retry_after
+
+    assert _retry_after(_Resp(429, {"Retry-After": "7"}), attempt=0) == 7.0
+    assert _retry_after(_Resp(429), attempt=2) == SARVAM_BACKOFF_S * 4
