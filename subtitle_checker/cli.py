@@ -247,47 +247,38 @@ def _run_script_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def _script_score(r):
-    """Re-score an ASR ledger row for the script pipeline: the authored script is
-    fully trusted, so the score is the audio match alone, not the OCR-blended
-    combined_score the burn-in pipeline uses."""
-    if r.score is not None:
-        r.ocr_confidence = None
-        r.combined_score = round(r.score * 100, 1)
-    return r
-
-
 def _run_script_audio_checks(video: Path, events: list, out_dir: Path, lang: str) -> None:
-    """ASR-only audio checks for the script pipeline: label the audio, raise
-    structural gaps, transcribe each line heard-vs-script, write the report."""
-    from subtitle_checker.artifacts import save_artifact
-    from subtitle_checker.audio.regions import label_regions
-    from subtitle_checker.ingest.audio_track import extract_audio
-    from subtitle_checker.match.structural import check_structural
+    """Whole-transcript audio-vs-script check: transcribe the full audio once,
+    align it to the script word-for-word, write the per-cue heard-vs-script report.
 
-    try:
-        from subtitle_checker.audio.vad import SileroVad
-        vad = SileroVad()
-        audio = extract_audio(video)
-        regions = label_regions(audio, vad)
-    except ImportError:
-        print("audio stage skipped - install the extra with: pip install '.[audio]'")
+    No per-cue windowing and no VAD - the global alignment re-attributes heard
+    words to the cue they belong to, so a sentence split across short cues or a
+    small intro timing offset no longer manufactures false mismatches.
+    """
+    import os
+
+    if not os.environ.get("SARVAM_API_KEY"):
+        print(
+            "ASR skipped - set SARVAM_API_KEY to run the audio-vs-script check",
+            file=sys.stderr,
+        )
         return
 
-    save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
-    flags = check_structural(events, regions)
-    ledger = [_script_score(r) for r in _asr_ledger(events, audio, regions, lang)]
-    results = _merge_results(flags, ledger)
-    results.sort(key=lambda r: r.start)
-    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.ingest.audio_track import extract_audio
+    from subtitle_checker.match.asr import SarvamAsr
+    from subtitle_checker.match.script_align import align_script, transcribe_full
 
-    from subtitle_checker.match.asr import skipped_lines
+    audio = extract_audio(video)
+    engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+    heard = transcribe_full(audio, engine)
+    results = align_script(events, heard)
+    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
     _print_flags(results)
     _write_report(
         video, results, out_dir,
         title=f"Audio vs script - {video.stem}",
-        skipped=skipped_lines(events, results, regions),
         source_label="script",
     )
 
