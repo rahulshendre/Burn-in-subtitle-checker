@@ -83,6 +83,7 @@ def render_report(
     legibility: VideoLegibility | None = None,
     compliance: VideoCompliance | None = None,
     recommendations: list | None = None,
+    source_label: str = "OCR",
 ) -> str:
     """Render check results into one self-contained HTML document.
 
@@ -93,7 +94,9 @@ def render_report(
     editor sees they were passed over deliberately rather than missed.
     ``legibility``, when supplied, adds the whole-video presentation grade and
     its least legible lines - a channel-facing read separate from the mismatch
-    check.
+    check. ``source_label`` names where the written text came from - "OCR" for
+    the burn-in pipeline, "script" for the audio-vs-script pipeline that reads an
+    authored subtitle file instead of pixels.
     """
     flags = [r for r in results if r.verdict is not Verdict.OK]
     oks = [r for r in results if r.verdict is Verdict.OK]
@@ -106,11 +109,13 @@ def render_report(
         _summary(title, results, stamp),
         _legibility_banner(legibility),
         _compliance_banner(compliance),
-        _flags_section(flags, evidence),
-        _ledger_section(oks, evidence),
+        _flags_section(flags, evidence, source_label),
+        _ledger_section(oks, evidence, source_label),
         _legibility_section(legibility, evidence),
         _recommendations_section(recommendations),
-        _skipped_section(sorted(skipped or [], key=lambda s: s[0].start), evidence),
+        _skipped_section(
+            sorted(skipped or [], key=lambda s: s[0].start), evidence, source_label
+        ),
         _foot(),
     ]
     return "\n".join(parts)
@@ -144,20 +149,22 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
     )
 
 
-def _flags_section(flags: list[CheckResult], evidence: Evidence) -> str:
+def _flags_section(
+    flags: list[CheckResult], evidence: Evidence, source_label: str = "OCR"
+) -> str:
     if not flags:
         return '<section><p class="empty">No flags raised on this clip.</p></section>'
-    cards = "\n".join(_card(r, evidence) for r in flags)
+    cards = "\n".join(_card(r, evidence, source_label) for r in flags)
     return f'<section class="flags"><h2>Flags</h2>{cards}</section>'
 
 
-def _card(r: CheckResult, evidence: Evidence) -> str:
+def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     color = _VERDICT_COLOR[r.verdict]
     frame = _frame_html(evidence.frame_png((r.start + r.end) / 2.0))
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
-    score = _score_html(r)
+    score = _score_html(r, source_label)
     written, heard = _written_heard(
         r, no_subtitle='<em class="none">- no subtitle -</em>',
         not_heard='<em class="none">- not transcribed -</em>',
@@ -171,7 +178,7 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
         f'<div class="frame">{frame}</div>'
         f'<div class="detail">'
         f'<div class="texts">'
-        f'<div class="col"><h4>Written (OCR)</h4><p class="deva">{written}</p></div>'
+        f'<div class="col"><h4>Written ({source_label})</h4><p class="deva">{written}</p></div>'
         f'<div class="col"><h4>Heard (ASR)</h4><p class="deva">{heard}</p></div>'
         f"</div>"
         f'<p class="reason">{html.escape(r.reason)}</p>{audio}'
@@ -179,49 +186,51 @@ def _card(r: CheckResult, evidence: Evidence) -> str:
     )
 
 
-def _score_breakdown(r: CheckResult) -> list[str]:
-    """The OCR and ASR confidences that fold into the combined score."""
+def _score_breakdown(r: CheckResult, source_label: str = "OCR") -> list[str]:
+    """The source-read and ASR confidences that fold into the combined score."""
     bits = []
     if r.ocr_confidence is not None:
-        bits.append(f"OCR {r.ocr_confidence:.0%}")
+        bits.append(f"{source_label} {r.ocr_confidence:.0%}")
     if r.score is not None:
         bits.append(f"ASR {r.score:.0%}")
     return bits
 
 
-def _score_html(r: CheckResult) -> str:
-    """Card-head score: the one combined confidence with its OCR + ASR parts."""
+def _score_html(r: CheckResult, source_label: str = "OCR") -> str:
+    """Card-head score: the one combined confidence with its source + ASR parts."""
     if r.combined_score is None:
         return ""
-    bits = _score_breakdown(r)
+    bits = _score_breakdown(r, source_label)
     detail = f' <small>{" &middot; ".join(bits)}</small>' if bits else ""
     return f'<span class="score">score {r.combined_score:.0f}{detail}</span>'
 
 
-def _score_cell(r: CheckResult) -> str:
-    """Ledger score column: the combined number over its OCR + ASR parts."""
+def _score_cell(r: CheckResult, source_label: str = "OCR") -> str:
+    """Ledger score column: the combined number over its source + ASR parts."""
     if r.combined_score is None:
         return '<td class="score-cell">-</td>'
-    bits = _score_breakdown(r)
+    bits = _score_breakdown(r, source_label)
     detail = f'<br><small>{html.escape(" · ".join(bits))}</small>' if bits else ""
     return f'<td class="score-cell">{r.combined_score:.0f}{detail}</td>'
 
 
-def _ledger_section(oks: list[CheckResult], evidence: Evidence) -> str:
+def _ledger_section(
+    oks: list[CheckResult], evidence: Evidence, source_label: str = "OCR"
+) -> str:
     if not oks:
         return ""
-    rows = "\n".join(_ledger_row(r, evidence) for r in oks)
+    rows = "\n".join(_ledger_row(r, evidence, source_label) for r in oks)
     return (
         '<section class="ledger"><h2>Matching lines - heard vs written</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
-        '<table><thead><tr><th>Time</th><th>Frame</th><th>Written (OCR)</th>'
+        f'<table><thead><tr><th>Time</th><th>Frame</th><th>Written ({source_label})</th>'
         "<th>Heard (ASR)</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
 
 
-def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
+def _ledger_row(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     thumb = _thumb_html(evidence.frame_png((r.start + r.end) / 2.0))
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
@@ -230,7 +239,7 @@ def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     return (
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
-        f"{_score_cell(r)}<td>{audio}</td></tr>"
+        f"{_score_cell(r, source_label)}<td>{audio}</td></tr>"
     )
 
 
@@ -439,7 +448,9 @@ def _compliance_violations(comp: VideoCompliance) -> str:
 
 
 def _skipped_section(
-    skipped: list[tuple[SubtitleEvent, str]], evidence: Evidence
+    skipped: list[tuple[SubtitleEvent, str]],
+    evidence: Evidence,
+    source_label: str = "OCR",
 ) -> str:
     if not skipped:
         return ""
@@ -449,7 +460,7 @@ def _skipped_section(
         '<p class="note">These subtitles were detected but not verified '
         "word-for-word - checking them against the audio would risk a false "
         "alarm. Each row says why.</p>"
-        '<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle (OCR read)</th>'
+        f'<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle ({source_label} read)</th>'
         "<th>Why skipped</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )

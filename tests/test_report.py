@@ -74,6 +74,23 @@ def test_document_is_self_contained_html():
     assert 'src="http' not in out and "<link" not in out
 
 
+def test_source_label_defaults_to_ocr():
+    out = render_report(_sample(), FakeEvidence(), title="Demo")
+    assert "Written (OCR)" in out
+    assert "Written (script)" not in out
+
+
+def test_source_label_script_relabels_written_and_score():
+    out = render_report(
+        _sample(), FakeEvidence(), title="Demo", source_label="script"
+    )
+    assert "Written (script)" in out
+    assert "Written (OCR)" not in out
+    # the score breakdown names the source too, not "OCR"
+    assert "script 60%" in out
+    assert "OCR 60%" not in out
+
+
 def test_flags_render_worst_first_ok_excluded_from_cards():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
     # two flags -> two cards; the OK row is not a card
