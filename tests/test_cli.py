@@ -42,6 +42,23 @@ def test_check_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:
     assert "not found" in capsys.readouterr().err
 
 
+def test_check_script_rejects_missing_video(capsys: pytest.CaptureFixture) -> None:
+    code = main(["check-script", "--video", "no_such.mp4", "--script", "no_such.srt"])
+    assert code == 2
+    assert "not found" in capsys.readouterr().err
+
+
+def test_check_script_rejects_missing_script(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    # A video that exists but a script path that does not -> clean error, not a crash.
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"not really a video")
+    code = main(["check-script", "--video", str(video), "--script", "no_such.srt"])
+    assert code == 2
+    assert "script not found" in capsys.readouterr().err
+
+
 def test_merge_prefers_asr_evidence_over_bare_alignment_flag() -> None:
     align = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "alignment", subtitle_text="X")
     asr = CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "asr", "X", heard_text="Y", score=0.3)

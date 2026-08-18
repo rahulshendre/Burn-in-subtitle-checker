@@ -39,6 +39,15 @@ def build_parser() -> argparse.ArgumentParser:
         "(cloud quality engine, needs SARVAM_API_KEY)",
     )
 
+    cs = subparsers.add_parser(
+        "check-script",
+        help="Check audio against an authored subtitle file (SRT/VTT) - ASR only, no OCR",
+    )
+    cs.add_argument("--video", required=True, help="Path to the input video (audio source)")
+    cs.add_argument("--script", required=True, help="Authored subtitle file (SRT or VTT)")
+    cs.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
+    cs.add_argument("--out", default="out", help="Directory for artifacts and the report")
+
     leg = subparsers.add_parser(
         "legibility",
         help="Grade a video's subtitle legibility (Stage 1 only, no audio needed)",
@@ -116,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(args)
+    if args.command == "check-script":
+        return _run_script_check(args)
     if args.command == "legibility":
         return _run_legibility(args)
     if args.command == "report":
@@ -198,6 +209,87 @@ def _run_check(args: argparse.Namespace) -> int:
     _print_compliance(events)
     _run_audio_checks(video, events, out_dir, args.lang, args.asr)
     return 0
+
+
+def _run_script_check(args: argparse.Namespace) -> int:
+    """Audio-vs-script pipeline: compare the audio to an authored SRT/VTT file.
+
+    No OCR and no legibility - the reference text is the authored subtitle file,
+    fully trusted, so this checks only whether the spoken audio matches what the
+    script says (the ASR cross-check) plus the structural gaps (a scripted line
+    with no speech under it, or speech with no scripted line).
+    """
+    video = _require_video(args.video)
+    if video is None:
+        return 2
+    script = Path(args.script)
+    if not script.exists():
+        print(f"script not found: {script}", file=sys.stderr)
+        return 2
+
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.subtitles.srt import parse_script
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    events = parse_script(script)
+    if not events:
+        print(f"no subtitle cues parsed from: {script}", file=sys.stderr)
+        return 2
+    artifact = out_dir / f"{video.stem}_subtitle_events.json"
+    save_artifact(artifact, "subtitle_events", events)
+    print(f"{len(events)} script cue(s) -> {artifact}")
+    for event in events:
+        print(f"  {event.start:7.2f}-{event.end:7.2f}  {event.text}")
+
+    _run_script_audio_checks(video, events, out_dir, args.lang)
+    return 0
+
+
+def _script_score(r):
+    """Re-score an ASR ledger row for the script pipeline: the authored script is
+    fully trusted, so the score is the audio match alone, not the OCR-blended
+    combined_score the burn-in pipeline uses."""
+    if r.score is not None:
+        r.ocr_confidence = None
+        r.combined_score = round(r.score * 100, 1)
+    return r
+
+
+def _run_script_audio_checks(video: Path, events: list, out_dir: Path, lang: str) -> None:
+    """ASR-only audio checks for the script pipeline: label the audio, raise
+    structural gaps, transcribe each line heard-vs-script, write the report."""
+    from subtitle_checker.artifacts import save_artifact
+    from subtitle_checker.audio.regions import label_regions
+    from subtitle_checker.ingest.audio_track import extract_audio
+    from subtitle_checker.match.structural import check_structural
+
+    try:
+        from subtitle_checker.audio.vad import SileroVad
+        vad = SileroVad()
+        audio = extract_audio(video)
+        regions = label_regions(audio, vad)
+    except ImportError:
+        print("audio stage skipped - install the extra with: pip install '.[audio]'")
+        return
+
+    save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
+    flags = check_structural(events, regions)
+    ledger = [_script_score(r) for r in _asr_ledger(events, audio, regions, lang)]
+    results = _merge_results(flags, ledger)
+    results.sort(key=lambda r: r.start)
+    save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
+
+    from subtitle_checker.match.asr import skipped_lines
+
+    _print_flags(results)
+    _write_report(
+        video, results, out_dir,
+        title=f"Audio vs script - {video.stem}",
+        skipped=skipped_lines(events, results, regions),
+        source_label="script",
+    )
 
 
 def _run_legibility(args: argparse.Namespace) -> int:
@@ -482,15 +574,17 @@ def _write_report(
     legibility: object | None = None,
     compliance: object | None = None,
     recommendations: list | None = None,
+    title: str | None = None,
+    source_label: str = "OCR",
 ) -> None:
     from subtitle_checker.report.evidence import write_report
 
     path = out_dir / f"{video.stem}_report.html"
     write_report(
         video, results, path,
-        title=_report_title(video), skipped=skipped,
+        title=title or _report_title(video), skipped=skipped,
         legibility=legibility, compliance=compliance,
-        recommendations=recommendations,
+        recommendations=recommendations, source_label=source_label,
     )
     print(f"report -> {path}")
 
