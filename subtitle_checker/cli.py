@@ -115,6 +115,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         help="Friendly label for each path, in order (repeatable)",
     )
+    ui.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo layout: a video picker plus a transcript (SRT) upload, then Check",
+    )
+    ui.add_argument(
+        "--srt",
+        action="append",
+        help="Transcript (SRT) filename shown per video, in order (repeatable)",
+    )
 
     return parser
 
@@ -145,13 +155,20 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_ui(args: argparse.Namespace) -> int:
-    from subtitle_checker.report.webui import discover_reports, relabel, serve
+    from subtitle_checker.report.webui import (
+        attach_transcripts,
+        discover_reports,
+        relabel,
+        serve,
+    )
 
     entries = relabel(discover_reports([Path(p) for p in args.paths]), args.label or [])
+    if args.demo:
+        entries = attach_transcripts(entries, args.srt or [])
     if not entries:
         print(f"no reports found in: {', '.join(args.paths)}", file=sys.stderr)
         print("generate one first with: subtitle-checker check --video <clip>", file=sys.stderr)
-    serve(entries, port=args.port, open_browser=not args.no_open)
+    serve(entries, port=args.port, open_browser=not args.no_open, demo=args.demo)
     return 0
 
 

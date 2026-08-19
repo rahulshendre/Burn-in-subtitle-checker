@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from subtitle_checker.report.webui import (
     ReportEntry,
+    attach_transcripts,
     discover_reports,
     relabel,
+    render_demo_index,
     render_index,
 )
 
@@ -55,6 +57,39 @@ def test_render_index_lists_entries_with_a_viewer():
 
 def test_render_index_empty_state():
     page = render_index([])
+
+    assert "No reports found" in page
+    assert "<iframe" not in page
+
+
+def test_attach_transcripts_sets_names_and_defaults():
+    entries = [
+        ReportEntry(id="0", label="Anupamaa wedding", path=None),
+        ReportEntry(id="1", label="Mann", path=None),
+    ]
+
+    out = attach_transcripts(entries, ["without-ocr.srt"])
+
+    assert out[0].transcript == "without-ocr.srt"
+    assert out[1].transcript == "Mann.srt"  # unmatched defaults to <label>.srt
+
+
+def test_render_demo_index_has_video_and_transcript_controls():
+    entries = [
+        ReportEntry(id="0", label="Anupamaa wedding", path=None, transcript="wedding.srt"),
+    ]
+
+    page = render_demo_index(entries, title="Subtitle Checker")
+
+    assert '<select id="video">' in page  # video picker
+    assert 'type="file"' in page and 'id="srt"' in page  # transcript upload
+    assert "wedding.srt" in page  # the transcript name shows
+    assert '<iframe id="view"' in page
+    assert 'data-srt="wedding.srt"' in page
+
+
+def test_render_demo_index_empty_state():
+    page = render_demo_index([])
 
     assert "No reports found" in page
     assert "<iframe" not in page

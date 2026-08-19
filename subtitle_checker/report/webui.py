@@ -30,6 +30,7 @@ class ReportEntry:
     id: str
     label: str
     path: Path
+    transcript: str = ""  # SRT filename shown beside the video in demo layout
 
 
 def _clean_label(stem: str) -> str:
@@ -75,6 +76,25 @@ def relabel(entries: list[ReportEntry], labels: list[str]) -> list[ReportEntry]:
     ]
 
 
+def attach_transcripts(entries: list[ReportEntry], names: list[str]) -> list[ReportEntry]:
+    """Set the SRT filename shown per video in the demo layout, positionally.
+
+    Unmatched entries default to ``<label>.srt`` so the transcript field is never
+    blank in the demo.
+    """
+    return [
+        replace(
+            e,
+            transcript=(
+                names[i].strip()
+                if i < len(names) and names[i].strip()
+                else f"{e.label}.srt"
+            ),
+        )
+        for i, e in enumerate(entries)
+    ]
+
+
 def render_index(entries: list[ReportEntry], *, title: str = "Burn-in subtitle checker") -> str:
     """Render the picker shell that loads a report into an iframe."""
     if entries:
@@ -111,6 +131,69 @@ def render_index(entries: list[ReportEntry], *, title: str = "Burn-in subtitle c
     )
 
 
+def render_demo_index(
+    entries: list[ReportEntry], *, title: str = "Subtitle checker"
+) -> str:
+    """Render the demo layout: pick a video, pick its transcript (SRT), Check.
+
+    Nothing runs live - selecting a video loads its pre-built report. The
+    transcript control mirrors the real upload step so the 30-second walkthrough
+    shows the whole workflow (video in, transcript in, result out).
+    """
+    if not entries:
+        body = (
+            f'<div class="bar"><div class="brand">{html.escape(title)}</div></div>'
+            '<p class="empty">No reports found. Generate one with '
+            "<code>subtitle-checker check-script</code> first.</p>"
+        )
+        return _page(title, body)
+
+    options = "".join(
+        f'<option value="{e.id}" data-srt="{html.escape(e.transcript)}">'
+        f"{html.escape(e.label)}</option>"
+        for e in entries
+    )
+    first_srt = html.escape(entries[0].transcript)
+    controls = (
+        '<div class="field"><label for="video">Video</label>'
+        f'<select id="video">{options}</select></div>'
+        '<div class="field"><label for="srt">Transcript (SRT)</label>'
+        '<label class="upload" for="srt">'
+        '<span class="upload-btn">Choose file</span>'
+        f'<span id="srtname" class="upload-name">{first_srt}</span>'
+        '<input type="file" id="srt" accept=".srt,.vtt,.txt" hidden></label></div>'
+        '<button id="go">Check</button>'
+    )
+    body = (
+        f'<div class="bar"><div class="brand">{html.escape(title)}</div>'
+        f'<div class="controls">{controls}</div></div>'
+        '<iframe id="view" title="report"></iframe>'
+        "<script>"
+        "var video=document.getElementById('video');"
+        "var srt=document.getElementById('srt');"
+        "var srtname=document.getElementById('srtname');"
+        "var view=document.getElementById('view');"
+        "function selSrt(){var o=video.options[video.selectedIndex];"
+        "srtname.textContent=o.getAttribute('data-srt')||'';}"
+        "function show(){view.src='/report/'+encodeURIComponent(video.value);}"
+        "video.onchange=function(){selSrt();show();};"
+        "srt.onchange=function(){if(srt.files[0])srtname.textContent=srt.files[0].name;};"
+        "document.getElementById('go').onclick=show;"
+        "selSrt();show();"
+        "</script>"
+    )
+    return _page(title, body)
+
+
+def _page(title: str, body: str) -> str:
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{html.escape(title)}</title>{_STYLE}</head><body>{body}</body></html>"
+    )
+
+
 _STYLE = """<style>
   * { box-sizing:border-box; }
   body { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; margin:0;
@@ -119,7 +202,17 @@ _STYLE = """<style>
          gap:1rem; padding:.7rem 1.2rem; background:#1f6f43; color:#fff;
          box-shadow:0 1px 4px rgba(0,0,0,.2); }
   .brand { font-weight:600; font-size:1.1rem; }
-  .controls { display:flex; gap:.5rem; }
+  .controls { display:flex; gap:.9rem; align-items:flex-end; }
+  .field { display:flex; flex-direction:column; gap:.15rem; }
+  .field label { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+                 opacity:.85; }
+  .upload { display:flex; align-items:center; gap:.5rem; cursor:pointer;
+            background:#fff; border:1px solid #cfe; border-radius:5px;
+            padding:.25rem .3rem; }
+  .upload-btn { font-size:.85rem; padding:.15rem .55rem; border-radius:4px;
+                background:#2a6; color:#fff; font-weight:600; }
+  .upload-name { font-size:.9rem; color:#333; max-width:14rem; overflow:hidden;
+                 text-overflow:ellipsis; white-space:nowrap; }
   select { font-size:.95rem; padding:.35rem .5rem; border-radius:5px;
            border:1px solid #cfe; min-width:16rem; }
   button { font-size:.95rem; padding:.35rem 1rem; border:0; border-radius:5px;
@@ -166,9 +259,14 @@ def serve(
     port: int = 8000,
     open_browser: bool = True,
     title: str = "Burn-in subtitle checker",
+    demo: bool = False,
 ) -> None:
     """Serve the picker and reports on a local port until interrupted."""
-    index_html = render_index(entries, title=title)
+    index_html = (
+        render_demo_index(entries, title=title)
+        if demo
+        else render_index(entries, title=title)
+    )
     handler = _make_handler(index_html, {e.id: e.path for e in entries})
     httpd = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
