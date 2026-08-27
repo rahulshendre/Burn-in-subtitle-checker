@@ -4,7 +4,7 @@ Forced alignment (align.py) catches gross mismatches but not single-word errors
 - a swapped word barely moves the alignment score. An Indic-specialised ASR
 does catch them: transcribe the audio under a subtitle and compare the words.
 Sarvam reads Devanagari off noisy PlanetRead audio far better than Whisper (the
-six-month finding), so Sarvam Saaras v3 is the default engine; the AsrEngine
+six-month finding), so Sarvam Saaras v4 is the default engine; the AsrEngine
 Protocol keeps it swappable and lets the pipeline and tests run with no network.
 
 The comparison is rapidfuzz token_set_ratio - order-insensitive, which suits
@@ -51,10 +51,9 @@ MIN_WORDS = 3
 MIN_MISMATCH_SPAN = 1.5
 
 SARVAM_URL = "https://api.sarvam.ai/speech-to-text"
-# Saaras v3 is Sarvam's current STT model; Saarika v2.5 is being deprecated. Its
-# transcribe mode returns native Devanagari (not the English translate mode),
-# which is what we compare against the burned-in subtitle.
-SARVAM_MODEL = "saaras:v3"
+# Saaras v4 is Sarvam's current STT model (v3 remains available; v4 adds Global
+# English and expanded language support, same transcribe mode, same endpoint).
+SARVAM_MODEL = "saaras:v4"
 SARVAM_MODE = "transcribe"
 # The sync endpoint rate-limits a fast burst of per-line calls with a 429. A long
 # clip has dozens of lines, so a naive loop trips it and crashes the run mid-way.
@@ -71,7 +70,7 @@ class AsrEngine(Protocol):
 
 
 class SarvamAsr:
-    """Sarvam Saaras v3 speech-to-text (transcribe mode).
+    """Sarvam Saaras v4 speech-to-text (transcribe mode).
 
     Reads SARVAM_API_KEY from the environment and never stores it. `lang` is
     Sarvam's BCP-47 code (hi-IN, kn-IN, mr-IN). The sync endpoint is short-audio
