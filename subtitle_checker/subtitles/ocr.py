@@ -84,6 +84,14 @@ class EasyOcrEngine:
 # come from a different measurement, not this value.
 SARVAM_VISION_TRUSTED_CONF = 0.99
 
+# One Vision job runs per subtitle band, so a long clip fires dozens back to
+# back and the endpoint answers a burst with 429 Rate limit exceeded - which,
+# unhandled, crashes the whole run mid-way. Back off and retry, mirroring the
+# ASR cross-check (match.asr): honour the server's Retry-After when present,
+# else exponential backoff. A 429 that survives every retry still raises.
+SARVAM_VISION_MAX_RETRIES = 5
+SARVAM_VISION_BACKOFF_S = 2.0
+
 
 # Fed a band with no legible subtitle, Sarvam Vision sometimes narrates the
 # picture instead of transcribing it, e.g. `यह छवि एक ग्रेस्केल (black and white)
@@ -195,6 +203,38 @@ class SarvamVisionOcr:
         return _vision_text(_sarvam_vision_blocks(self._client, band, self._lang))
 
 
+def _start_vision_job(client, png_path: str, lang: str):
+    """Create + start one Vision job, retrying past a 429 rate limit.
+
+    A long clip fires one job per band in quick succession and the endpoint
+    429s a burst. Retry with backoff (Retry-After if the server sends one, else
+    exponential) so the run rides out the limit instead of crashing. A 429 that
+    outlasts every retry propagates.
+    """
+    import time
+
+    from sarvamai.errors.too_many_requests_error import TooManyRequestsError
+
+    for attempt in range(SARVAM_VISION_MAX_RETRIES + 1):
+        try:
+            job = client.document_intelligence.create_job(
+                language=lang, output_format="md"
+            )
+            job.upload_file(png_path)
+            job.start()
+            return job
+        except TooManyRequestsError:
+            if attempt >= SARVAM_VISION_MAX_RETRIES:
+                raise
+            time.sleep(_vision_retry_after(attempt))
+    raise AssertionError("unreachable")  # loop returns or raises every path
+
+
+def _vision_retry_after(attempt: int) -> float:
+    """Seconds to wait before retrying a 429 - exponential backoff by attempt."""
+    return SARVAM_VISION_BACKOFF_S * (2**attempt)
+
+
 def _sarvam_vision_blocks(client, band: np.ndarray, lang: str) -> list[str]:
     """Run one document-intelligence job on a band image -> its text blocks.
 
@@ -212,9 +252,7 @@ def _sarvam_vision_blocks(client, band: np.ndarray, lang: str) -> list[str]:
         tmp = Path(tmp)
         png = tmp / "band.png"
         Image.fromarray(band).save(png)
-        job = client.document_intelligence.create_job(language=lang, output_format="md")
-        job.upload_file(str(png))
-        job.start()
+        job = _start_vision_job(client, str(png), lang)
         job.wait_until_complete(poll_interval=1.5, timeout=120)
         zpath = tmp / "out.zip"
         job.download_output(str(zpath))

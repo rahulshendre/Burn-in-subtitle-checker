@@ -112,3 +112,72 @@ def test_vision_text_strips_logo_merged_into_a_real_line():
     text, conf = _vision_text(["इस तरह इन्सल्ट करती हैं? TATA PLAY"])
     assert text == "इस तरह इन्सल्ट करती हैं?"
     assert conf == SARVAM_VISION_TRUSTED_CONF
+
+
+class _FakeJob:
+    def upload_file(self, _path) -> None:
+        pass
+
+    def start(self) -> None:
+        pass
+
+
+class _FakeDocIntel:
+    """A create_job that 429s a set number of times, then returns a job."""
+
+    def __init__(self, fails: int) -> None:
+        self._fails = fails
+        self.calls = 0
+
+    def create_job(self, **_kwargs) -> _FakeJob:
+        from sarvamai.errors.too_many_requests_error import TooManyRequestsError
+
+        self.calls += 1
+        if self.calls <= self._fails:
+            raise TooManyRequestsError(headers={}, body={})
+        return _FakeJob()
+
+
+class _FakeClient:
+    def __init__(self, fails: int) -> None:
+        self.document_intelligence = _FakeDocIntel(fails)
+
+
+def test_vision_job_retries_on_429_then_succeeds(monkeypatch) -> None:
+    from subtitle_checker.subtitles.ocr import _start_vision_job
+
+    slept: list[float] = []
+    monkeypatch.setattr("time.sleep", lambda s: slept.append(s))
+    client = _FakeClient(fails=2)
+
+    _start_vision_job(client, "band.png", "hi-IN")
+    assert client.document_intelligence.calls == 3  # two 429s retried, third ok
+    assert len(slept) == 2
+
+
+def test_vision_job_raises_after_exhausting_retries(monkeypatch) -> None:
+    import pytest
+
+    from sarvamai.errors.too_many_requests_error import TooManyRequestsError
+
+    from subtitle_checker.subtitles.ocr import (
+        SARVAM_VISION_MAX_RETRIES,
+        _start_vision_job,
+    )
+
+    monkeypatch.setattr("time.sleep", lambda _s: None)
+    client = _FakeClient(fails=SARVAM_VISION_MAX_RETRIES + 1)
+
+    with pytest.raises(TooManyRequestsError):
+        _start_vision_job(client, "band.png", "hi-IN")
+    assert client.document_intelligence.calls == SARVAM_VISION_MAX_RETRIES + 1
+
+
+def test_vision_retry_after_grows_exponentially() -> None:
+    from subtitle_checker.subtitles.ocr import (
+        SARVAM_VISION_BACKOFF_S,
+        _vision_retry_after,
+    )
+
+    assert _vision_retry_after(0) == SARVAM_VISION_BACKOFF_S
+    assert _vision_retry_after(2) == SARVAM_VISION_BACKOFF_S * 4
