@@ -15,6 +15,7 @@ from pathlib import Path
 
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent
 from subtitle_checker.report.html import render_report
+from subtitle_checker.report.mistakes import render_mistakes
 
 FRAME_WIDTH = 320
 AUDIO_RATE = 22_050
@@ -82,6 +83,29 @@ def write_report(
         results, evidence, title=title or video.stem, generated=generated,
         skipped=skipped, legibility=legibility, compliance=compliance,
         recommendations=recommendations, source_label=source_label,
+    )
+    out_path.write_text(document, encoding="utf-8")
+    return out_path
+
+
+def write_mistakes(
+    video: Path,
+    results: list[CheckResult],
+    out_path: Path,
+    *,
+    title: str | None = None,
+    generated: str | None = None,
+    source_label: str = "OCR",
+) -> Path:
+    """Render only the flagged mistakes (with corrections) to a self-contained HTML file.
+
+    The production-team page: the same frames and audio as the full report, cut
+    with the same ffmpeg evidence, but just the errors and their suggested fixes.
+    """
+    evidence = FfmpegEvidence(video)
+    document = render_mistakes(
+        results, evidence, title=title or video.stem, generated=generated,
+        source_label=source_label,
     )
     out_path.write_text(document, encoding="utf-8")
     return out_path

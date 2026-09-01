@@ -391,7 +391,7 @@ def _run_report(args: argparse.Namespace) -> int:
         return 2
 
     from subtitle_checker.artifacts import load_artifact
-    from subtitle_checker.report.evidence import write_report
+    from subtitle_checker.report.evidence import write_mistakes, write_report
 
     kind, results = load_artifact(results_path)
     if kind != "check_results":
@@ -410,6 +410,12 @@ def _run_report(args: argparse.Namespace) -> int:
         recommendations=recommendations,
     )
     print(f"report -> {out}  ({len(results)} row(s))")
+
+    mistakes = out.parent / f"{video.stem}_mistakes.html"
+    write_mistakes(
+        video, results, mistakes, title=f"Subtitle mistakes - {video.stem}"
+    )
+    print(f"mistakes -> {mistakes}")
     return 0
 
 
@@ -585,7 +591,7 @@ def _write_report(
     title: str | None = None,
     source_label: str = "OCR",
 ) -> None:
-    from subtitle_checker.report.evidence import write_report
+    from subtitle_checker.report.evidence import write_mistakes, write_report
 
     path = out_dir / f"{video.stem}_report.html"
     write_report(
@@ -595,6 +601,13 @@ def _write_report(
         recommendations=recommendations, source_label=source_label,
     )
     print(f"report -> {path}")
+
+    mistakes_path = out_dir / f"{video.stem}_mistakes.html"
+    write_mistakes(
+        video, results, mistakes_path,
+        title=f"Subtitle mistakes - {video.stem}", source_label=source_label,
+    )
+    print(f"mistakes -> {mistakes_path}")
 
 
 def _run_eval_detection(args: argparse.Namespace) -> int:
