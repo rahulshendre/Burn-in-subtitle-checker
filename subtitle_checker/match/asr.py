@@ -19,6 +19,7 @@ from __future__ import annotations
 import io
 import os
 import wave
+from dataclasses import replace
 from typing import Protocol
 
 import numpy as np
@@ -49,6 +50,11 @@ MIN_WORDS = 3
 # still appears in the ledger with its heard-vs-written for the editor - it is
 # only held back from the auto-flag list.
 MIN_MISMATCH_SPAN = 1.5
+# Fewest words a transcript of a MISSING span needs before it is offered as the
+# suggested caption text. A one- or two-word blurt is as likely an ASR latch as a
+# real line; below this the tool keeps its honest "could not determine" rather
+# than propose a fragment. Same spirit as MIN_HEARD_WORDS in report.suggest.
+MIN_SUGGEST_WORDS = 3
 
 SARVAM_URL = "https://api.sarvam.ai/speech-to-text"
 # Saaras v4 is Sarvam's current STT model (v3 remains available; v4 adds Global
@@ -257,6 +263,43 @@ def skipped_lines(
             reason = "nothing was transcribed for this line"
         skipped.append((event, reason))
     return skipped
+
+
+def transcribe_missing(
+    flags: list[CheckResult],
+    audio: np.ndarray,
+    engine: AsrEngine,
+    min_words: int = MIN_SUGGEST_WORDS,
+    sample_rate: int = SAMPLE_RATE,
+    pad: float = WINDOW_PAD_S,
+) -> list[CheckResult]:
+    """Fill in what the audio says under each MISSING_SUBTITLE span.
+
+    A missing-subtitle flag is raised by structural (structural.py) from the voice
+    detector alone - it knows speech is there but never transcribed it, so the
+    report can only say "not transcribed". This runs ASR on those spans so an
+    editor sees what the caption should have said, as an unverified best guess.
+
+    ASR is the weak side of the tool, so this is deliberately a suggestion and
+    never a verdict: the flag stays MISSING_SUBTITLE, only its ``heard_text`` is
+    filled, and only when the transcript carries enough words to be worth reading.
+    Non-MISSING flags are returned untouched. A MISSING span is by definition a
+    speech region (that is what raised it), so no music gate is needed here.
+    """
+    out: list[CheckResult] = []
+    for f in flags:
+        if f.verdict is not Verdict.MISSING_SUBTITLE:
+            out.append(f)
+            continue
+        w0 = max(0.0, f.start - pad)
+        w1 = min(len(audio) / sample_rate, f.end + pad)
+        window = audio[int(w0 * sample_rate) : int(w1 * sample_rate)]
+        heard = engine.transcribe(window) if window.size else ""
+        if len(heard.split()) < min_words:
+            out.append(f)  # too little heard to suggest - keep the honest blank
+            continue
+        out.append(replace(f, heard_text=heard))
+    return out
 
 
 def check_asr(

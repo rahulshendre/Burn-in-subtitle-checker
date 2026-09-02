@@ -48,17 +48,33 @@ def test_single_word_transcript_declines_to_suggest():
     assert s.text == ""
 
 
-def test_structural_flags_have_no_correction():
-    # a missing / orphan / uncheckable line has no mis-transcribed text to fix
-    for verdict in (
-        Verdict.MISSING_SUBTITLE,
-        Verdict.ORPHAN_SUBTITLE,
-        Verdict.UNCHECKABLE,
-    ):
+def test_orphan_and_uncheckable_have_no_correction():
+    # an orphan (sub over silence) or uncheckable (sub over music) span has no
+    # mis-transcribed text to fix - even if some noise was heard under it
+    for verdict in (Verdict.ORPHAN_SUBTITLE, Verdict.UNCHECKABLE):
         r = CheckResult(1.0, 3.0, verdict, "gap", heard_text="कुछ आवाज़ यहाँ")
         s = suggest_correction(r)
         assert s.confident is False
         assert s.text == ""
+
+
+def test_missing_with_transcript_offers_a_best_guess():
+    # a missing line has no wrong text, but ASR filled in what the audio says -
+    # offer it as an unverified best guess of the caption, not a confirmed fix
+    r = CheckResult(1.0, 4.0, Verdict.MISSING_SUBTITLE, "gap", heard_text="कुछ आवाज़ यहाँ")
+    s = suggest_correction(r)
+    assert s.confident is True
+    assert s.text == "कुछ आवाज़ यहाँ"
+    assert s.heading == "Audio says (best guess)"
+    assert "confirm" in s.note.lower()
+
+
+def test_missing_without_transcript_declines():
+    # a missing line ASR never transcribed keeps the honest "could not determine"
+    r = CheckResult(1.0, 4.0, Verdict.MISSING_SUBTITLE, "gap", heard_text="")
+    s = suggest_correction(r)
+    assert s.confident is False
+    assert "Could not determine" in s.note
 
 
 def test_ok_line_gets_no_suggestion():

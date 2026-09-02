@@ -144,11 +144,15 @@ def _mistake_card(r: CheckResult, evidence: Evidence, source_label: str) -> str:
 
 
 def _suggestion_html(r: CheckResult) -> str:
-    """The suggested correct text for a mistake, or an honest "could not tell"."""
+    """The suggested text for a mistake, or an honest "could not tell".
+
+    A corrected line and a filled-in missing line use different headings (see
+    report.suggest), so the editor is not told a best-guess is a confirmed fix.
+    """
     s = suggest_correction(r)
     if s.confident:
         return (
-            '<div class="suggest"><h4>Suggested correction</h4>'
+            f'<div class="suggest"><h4>{html.escape(s.heading)}</h4>'
             f'<p class="deva suggest-text">{html.escape(s.text)}</p>'
             f'<p class="suggest-note">{html.escape(s.note)}</p></div>'
         )

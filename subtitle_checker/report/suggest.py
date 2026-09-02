@@ -36,35 +36,48 @@ MIN_HEARD_WORDS = 2
 class Suggestion:
     """What the tool proposes for one flagged line.
 
-    ``text`` is the suggested correct wording when we can stand behind it, else
-    "". ``confident`` says whether a usable suggestion was found - when False,
-    ``note`` explains why the tool declined to guess.
+    ``text`` is the suggested wording when we can stand behind it, else "".
+    ``confident`` says whether a usable suggestion was found - when False, ``note``
+    explains why the tool declined to guess. ``heading`` is the label the card
+    shows above the text, so a corrected line and a filled-in missing line read
+    differently ("Suggested correction" vs "Audio says (best guess)").
     """
 
     text: str
     confident: bool
     note: str
+    heading: str = "Suggested correction"
 
 
 # Shown when the tool will not guess a correction. Honest by design: an editor
 # reads it as "check this yourself", not as an empty or broken field.
 _NO_SUGGESTION = "Could not determine the correct text - check the audio for this line."
 
+# The correction for a wrong line is the heard text, offered as the fix. A missing
+# line has no wrong text to correct - the heard text is what *should be captioned*,
+# offered as an unverified best guess (ASR is the weak side, see the module note).
+_CORRECTION_NOTE = "Suggested from what the audio says here."
+_MISSING_NOTE = "Unverified transcription of the audio - confirm before use."
+_MISSING_HEADING = "Audio says (best guess)"
+
 
 def suggest_correction(r: CheckResult) -> Suggestion:
-    """Propose the correct wording for one flagged line, or decline to.
+    """Propose the wording for one flagged line, or decline to.
 
-    The heard transcript becomes the suggestion only for a genuine text mismatch
-    that actually carries enough heard words to trust. A structural flag (missing
-    or orphan line, uncheckable span) has no heard line to correct toward, and a
-    mismatch whose transcript is empty or too short gets an honest "could not
-    determine" instead of a guessed one.
+    Two flags carry a suggestion. A genuine TEXT_MISMATCH whose transcript has
+    enough heard words gets the heard text as a correction. A MISSING_SUBTITLE
+    that ASR has since transcribed (match.asr.transcribe_missing) gets the heard
+    text as a best-guess of what the caption should say, labelled as unverified.
+    Every other case - an orphan or uncheckable span, or a flag whose transcript
+    is empty or too short - gets an honest "could not determine".
     """
-    if r.verdict is not Verdict.TEXT_MISMATCH:
-        # Missing / orphan / uncheckable: nothing was mis-transcribed to correct.
-        return Suggestion("", False, _NO_SUGGESTION)
     heard = r.heard_text.strip()
     if len(heard.split()) < MIN_HEARD_WORDS:
         # No transcript, or too little of one to read as the intended line.
         return Suggestion("", False, _NO_SUGGESTION)
-    return Suggestion(heard, True, "Suggested from what the audio says here.")
+    if r.verdict is Verdict.TEXT_MISMATCH:
+        return Suggestion(heard, True, _CORRECTION_NOTE)
+    if r.verdict is Verdict.MISSING_SUBTITLE:
+        return Suggestion(heard, True, _MISSING_NOTE, heading=_MISSING_HEADING)
+    # Orphan / uncheckable: nothing was mis-transcribed to correct.
+    return Suggestion("", False, _NO_SUGGESTION)

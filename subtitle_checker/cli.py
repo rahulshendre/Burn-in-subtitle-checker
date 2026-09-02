@@ -502,6 +502,7 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     results = flags
     if run_asr:
         results = _merge_results(flags, _asr_ledger(events, audio, regions, lang))
+        results = _fill_missing_text(results, audio, lang)
     results.sort(key=lambda r: r.start)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
 
@@ -549,6 +550,27 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
     except ImportError:
         print("ASR cross-check skipped - install the extra with: pip install '.[asr]'")
         return []
+
+
+def _fill_missing_text(results: list, audio, lang: str) -> list:
+    """Transcribe the audio under each MISSING_SUBTITLE span for a best-guess.
+
+    A missing-subtitle flag knows speech is there but never transcribed it, so the
+    report can only say "not transcribed". This fills in what the audio says, as an
+    unverified suggestion the editor can confirm. Gated on the same Sarvam key as
+    the ASR cross-check; other verdicts pass through untouched.
+    """
+    import os
+
+    if not os.environ.get("SARVAM_API_KEY"):
+        return results
+    from subtitle_checker.match.asr import SarvamAsr, transcribe_missing
+
+    try:
+        engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+        return transcribe_missing(results, audio, engine)
+    except ImportError:
+        return results
 
 
 def _merge_results(flags: list, ledger: list) -> list:

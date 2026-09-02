@@ -88,6 +88,23 @@ def test_structural_flag_declines_a_suggestion():
     assert "Could not determine the correct text" in out
 
 
+def test_missing_with_transcript_shows_best_guess():
+    # a missing line ASR has since transcribed offers what the audio says, framed
+    # as an unverified best guess - not the confirmed "Suggested correction" label
+    results = [
+        CheckResult(
+            1.0, 4.0, Verdict.MISSING_SUBTITLE, "speech with no subtitle",
+            heard_text="यहाँ कुछ बोला गया था",
+        )
+    ]
+    out = render_mistakes(results, FakeEvidence(), title="Demo")
+    assert "Audio says (best guess)" in out
+    assert "यहाँ कुछ बोला गया था" in out
+    assert "confirm before use" in out
+    assert "Suggested correction" not in out
+    assert "Could not determine the correct text" not in out
+
+
 def test_garbled_short_transcript_declines_a_suggestion():
     results = [
         CheckResult(

@@ -13,7 +13,13 @@ from subtitle_checker.artifacts import (
     SubtitleEvent,
     Verdict,
 )
-from subtitle_checker.match.asr import _to_wav, check_asr, skipped_lines, transcribe_lines
+from subtitle_checker.match.asr import (
+    _to_wav,
+    check_asr,
+    skipped_lines,
+    transcribe_lines,
+    transcribe_missing,
+)
 
 SPEECH = [AudioRegion(0.0, 6.0, AudioKind.SPEECH)]
 MUSIC = [AudioRegion(0.0, 6.0, AudioKind.MUSIC)]
@@ -137,6 +143,41 @@ def test_skipped_lines_without_regions_skips_speech_test() -> None:
     events = [SubtitleEvent(1.0, 2.0, "बिना क्षेत्र सूचना के", 0.1)]
     (_, reason), = skipped_lines(events, [], None)
     assert "confidence 0.10" in reason
+
+
+def _missing(start: float, end: float) -> CheckResult:
+    return CheckResult(start, end, Verdict.MISSING_SUBTITLE, "speech, no subtitle")
+
+
+def test_missing_gets_transcript_filled() -> None:
+    engine = ScriptedAsr("यहाँ कुछ बोला गया")
+    (r,) = transcribe_missing([_missing(1.0, 4.0)], AUDIO, engine)
+    assert r.verdict is Verdict.MISSING_SUBTITLE  # still a flag, not a verdict change
+    assert r.heard_text == "यहाँ कुछ बोला गया"
+    assert engine.calls == 1
+
+
+def test_missing_with_too_few_heard_words_stays_blank() -> None:
+    # a one-word blurt is as likely an ASR latch as a real line - keep it blank
+    (r,) = transcribe_missing([_missing(1.0, 4.0)], AUDIO, ScriptedAsr("शब्द"))
+    assert r.heard_text == ""
+
+
+def test_missing_with_nothing_heard_stays_blank() -> None:
+    (r,) = transcribe_missing([_missing(1.0, 4.0)], AUDIO, ScriptedAsr(""))
+    assert r.heard_text == ""
+
+
+def test_non_missing_flags_are_untouched() -> None:
+    # only missing spans get transcribed; a mismatch or orphan is passed through
+    engine = ScriptedAsr()  # would IndexError if called
+    flags = [
+        CheckResult(1.0, 4.0, Verdict.TEXT_MISMATCH, "diff", "लाइन", "सुना"),
+        CheckResult(5.0, 7.0, Verdict.ORPHAN_SUBTITLE, "silence", "अनाथ"),
+    ]
+    out = transcribe_missing(flags, AUDIO, engine)
+    assert out == flags
+    assert engine.calls == 0
 
 
 def test_to_wav_is_valid_pcm() -> None:
