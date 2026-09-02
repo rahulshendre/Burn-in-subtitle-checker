@@ -82,10 +82,13 @@ def test_mismatch_shows_a_suggested_correction():
     assert "हम सब की नज़र" in out  # the heard text offered as the fix
 
 
-def test_structural_flag_declines_a_suggestion():
+def test_missing_without_transcript_shows_action_note():
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo")
-    # the missing-subtitle flag has no heard line, so it says so honestly
-    assert "Could not determine the correct text" in out
+    # the sample missing-subtitle flag has no heard line - tell the editor to add
+    # a caption, not the wrong-text "could not determine the correct text"
+    assert "could not be transcribed" in out
+    assert "add a caption" in out.lower()
+    assert "Could not determine the correct text" not in out
 
 
 def test_missing_with_transcript_shows_best_guess():

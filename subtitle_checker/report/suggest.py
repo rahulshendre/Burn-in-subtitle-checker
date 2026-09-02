@@ -59,6 +59,12 @@ _NO_SUGGESTION = "Could not determine the correct text - check the audio for thi
 _CORRECTION_NOTE = "Suggested from what the audio says here."
 _MISSING_NOTE = "Unverified transcription of the audio - confirm before use."
 _MISSING_HEADING = "Audio says (best guess)"
+# A missing line ASR could not transcribe still needs a subtitle - tell the editor
+# what to do rather than reuse the wrong-text "could not determine the correct text".
+_MISSING_NO_TRANSCRIPT = (
+    "No subtitle here - speech was detected but could not be transcribed. "
+    "Listen to the audio and add a caption."
+)
 
 
 def suggest_correction(r: CheckResult) -> Suggestion:
@@ -67,17 +73,19 @@ def suggest_correction(r: CheckResult) -> Suggestion:
     Two flags carry a suggestion. A genuine TEXT_MISMATCH whose transcript has
     enough heard words gets the heard text as a correction. A MISSING_SUBTITLE
     that ASR has since transcribed (match.asr.transcribe_missing) gets the heard
-    text as a best-guess of what the caption should say, labelled as unverified.
-    Every other case - an orphan or uncheckable span, or a flag whose transcript
-    is empty or too short - gets an honest "could not determine".
+    text as a best-guess of what the caption should say, labelled as unverified;
+    one ASR could not transcribe gets an action note instead of a wrong-text
+    fallback. Every other case - an orphan or uncheckable span, or a mismatch
+    whose transcript is empty or too short - gets an honest "could not determine".
     """
     heard = r.heard_text.strip()
-    if len(heard.split()) < MIN_HEARD_WORDS:
-        # No transcript, or too little of one to read as the intended line.
-        return Suggestion("", False, _NO_SUGGESTION)
-    if r.verdict is Verdict.TEXT_MISMATCH:
-        return Suggestion(heard, True, _CORRECTION_NOTE)
+    enough = len(heard.split()) >= MIN_HEARD_WORDS
     if r.verdict is Verdict.MISSING_SUBTITLE:
-        return Suggestion(heard, True, _MISSING_NOTE, heading=_MISSING_HEADING)
-    # Orphan / uncheckable: nothing was mis-transcribed to correct.
+        if enough:
+            return Suggestion(heard, True, _MISSING_NOTE, heading=_MISSING_HEADING)
+        # Speech was there but nothing usable was heard - still needs a caption.
+        return Suggestion("", False, _MISSING_NO_TRANSCRIPT)
+    if r.verdict is Verdict.TEXT_MISMATCH and enough:
+        return Suggestion(heard, True, _CORRECTION_NOTE)
+    # Orphan / uncheckable, or a mismatch with no usable transcript.
     return Suggestion("", False, _NO_SUGGESTION)

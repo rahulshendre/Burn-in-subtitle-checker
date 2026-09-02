@@ -69,12 +69,15 @@ def test_missing_with_transcript_offers_a_best_guess():
     assert "confirm" in s.note.lower()
 
 
-def test_missing_without_transcript_declines():
-    # a missing line ASR never transcribed keeps the honest "could not determine"
+def test_missing_without_transcript_gives_an_action_note():
+    # a missing line ASR could not transcribe still needs a caption - tell the
+    # editor to listen and add one, not the wrong-text "could not determine"
     r = CheckResult(1.0, 4.0, Verdict.MISSING_SUBTITLE, "gap", heard_text="")
     s = suggest_correction(r)
     assert s.confident is False
-    assert "Could not determine" in s.note
+    assert s.text == ""
+    assert "add a caption" in s.note.lower()
+    assert "Could not determine" not in s.note
 
 
 def test_ok_line_gets_no_suggestion():
