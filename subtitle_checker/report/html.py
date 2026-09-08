@@ -121,6 +121,71 @@ def render_report(
     return "\n".join(parts)
 
 
+def accuracy_stats(results: list[CheckResult]) -> dict:
+    """Compute top-line accuracy numbers from a result list.
+
+    Returns a dict with: total (lines checked), matched (OK verdicts),
+    flagged (non-OK), and match_rate (0-100 float, None when total=0).
+    UNCHECKABLE lines are counted in total but excluded from the match-rate
+    denominator - they were not verified, so they should not dilute the score.
+    """
+    total = len(results)
+    uncheckable = sum(1 for r in results if r.verdict is Verdict.UNCHECKABLE)
+    checkable = total - uncheckable
+    matched = sum(1 for r in results if r.verdict is Verdict.OK)
+    flagged = sum(
+        1 for r in results
+        if r.verdict is not Verdict.OK and r.verdict is not Verdict.UNCHECKABLE
+    )
+    rate = (matched / checkable * 100) if checkable > 0 else None
+    return {
+        "total": total,
+        "matched": matched,
+        "flagged": flagged,
+        "uncheckable": uncheckable,
+        "match_rate": rate,
+    }
+
+
+def _accuracy_bar(results: list[CheckResult]) -> str:
+    """A stat bar: lines checked, matched, flagged, match rate %."""
+    if not results:
+        return ""
+    s = accuracy_stats(results)
+    rate_html = (
+        f'<span class="acc-rate" style="color:{_rate_color(s["match_rate"])}">'
+        f'{s["match_rate"]:.0f}% match rate</span>'
+        if s["match_rate"] is not None
+        else ""
+    )
+    unc = (
+        f'<span class="acc-item">{s["uncheckable"]} uncheckable</span>'
+        if s["uncheckable"]
+        else ""
+    )
+    return (
+        f'<div class="acc-bar">'
+        f'<span class="acc-item">{s["total"]} lines checked</span>'
+        f'<span class="acc-sep">&middot;</span>'
+        f'<span class="acc-item">{s["matched"]} matched</span>'
+        f'<span class="acc-sep">&middot;</span>'
+        f'<span class="acc-item">{s["flagged"]} flagged</span>'
+        + (f'<span class="acc-sep">&middot;</span>{unc}' if unc else "")
+        + (f'<span class="acc-sep">&middot;</span>{rate_html}' if rate_html else "")
+        + "</div>"
+    )
+
+
+def _rate_color(rate: float | None) -> str:
+    if rate is None:
+        return "#7f8c8d"
+    if rate >= 90:
+        return "#27ae60"
+    if rate >= 70:
+        return "#d4a017"
+    return "#c0392b"
+
+
 def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
     counts = {v: 0 for v in _VERDICT_ORDER}
     for r in results:
@@ -140,6 +205,7 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
     return (
         f'<header><h1>{html.escape(title)}</h1>'
         f'<p class="sub">Burn-in subtitle checker · {html.escape(stamp)}</p>'
+        f"{_accuracy_bar(results)}"
         f'<p class="headline">{headline}</p>'
         f'<div class="chips">{chips}</div>'
         "<p class=\"note\">Each card shows the subtitle frame, the written text beside "
@@ -644,4 +710,10 @@ _STYLE = """<style>
   td.why { color:#777; font-size:.88rem; }
   .thumb-img { width:150px; border-radius:3px; display:block; }
   td audio { width:190px; height:30px; margin:0; }
+  .acc-bar { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .6rem;
+             margin:.5rem 0 .8rem; padding:.55rem .8rem; background:#f5f9f6;
+             border:1px solid #cfe8d8; border-radius:6px; font-size:.92rem; }
+  .acc-item { color:#333; font-variant-numeric:tabular-nums; }
+  .acc-sep { color:#bbb; }
+  .acc-rate { font-weight:700; }
 </style>"""

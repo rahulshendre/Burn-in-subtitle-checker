@@ -6,8 +6,15 @@ is opaque bytes here; the ffmpeg-backed extractor is tested separately.
 
 from __future__ import annotations
 
+import pytest
+
 from subtitle_checker.artifacts import CheckResult, SubtitleEvent, Verdict
-from subtitle_checker.report.html import _diff_texts, _grapheme_clusters, render_report
+from subtitle_checker.report.html import (
+    _diff_texts,
+    _grapheme_clusters,
+    accuracy_stats,
+    render_report,
+)
 
 
 class FakeEvidence:
@@ -232,3 +239,49 @@ def test_ledger_highlights_a_matra_difference():
     ]
     out = render_report(results, FakeEvidence(), title="Demo")
     assert 'mark class="diff"' in out
+
+
+# --- accuracy_stats ---
+
+def test_accuracy_stats_mixed():
+    results = _sample()  # 1 MISSING + 1 TEXT_MISMATCH + 1 OK
+    s = accuracy_stats(results)
+    assert s["total"] == 3
+    assert s["matched"] == 1
+    assert s["flagged"] == 2
+    assert s["uncheckable"] == 0
+    assert s["match_rate"] == pytest.approx(1 / 3 * 100, abs=0.1)
+
+
+def test_accuracy_stats_all_ok():
+    results = [CheckResult(0.0, 1.0, Verdict.OK, "ok")]
+    s = accuracy_stats(results)
+    assert s["matched"] == 1 and s["flagged"] == 0
+    assert s["match_rate"] == pytest.approx(100.0)
+
+
+def test_accuracy_stats_uncheckable_excluded_from_rate():
+    results = [
+        CheckResult(0.0, 1.0, Verdict.OK, "ok"),
+        CheckResult(1.0, 2.0, Verdict.UNCHECKABLE, "music"),
+    ]
+    s = accuracy_stats(results)
+    assert s["total"] == 2 and s["uncheckable"] == 1
+    # rate = 1 matched / 1 checkable = 100%
+    assert s["match_rate"] == pytest.approx(100.0)
+
+
+def test_accuracy_stats_empty():
+    assert accuracy_stats([])["match_rate"] is None
+
+
+def test_accuracy_bar_appears_in_report():
+    out = render_report(_sample(), FakeEvidence(), title="Demo")
+    assert "lines checked" in out
+    assert "matched" in out
+    assert "match rate" in out
+
+
+def test_accuracy_bar_absent_for_empty_results():
+    out = render_report([], FakeEvidence(), title="Empty")
+    assert "lines checked" not in out

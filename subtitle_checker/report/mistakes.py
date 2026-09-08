@@ -30,6 +30,7 @@ from subtitle_checker.report.html import (
     _VERDICT_LABEL,
     _VERDICT_ORDER,
     Evidence,
+    _accuracy_bar,
     _audio_html,
     _frame_html,
     _ts,
@@ -61,14 +62,14 @@ def render_mistakes(
 
     parts = [
         _head(title),
-        _header(title, flags, stamp),
+        _header(title, results, flags, stamp),
         _mistakes_section(flags, evidence, source_label),
         "</body></html>",
     ]
     return "\n".join(parts)
 
 
-def _header(title: str, flags: list[CheckResult], stamp: str) -> str:
+def _header(title: str, results: list[CheckResult], flags: list[CheckResult], stamp: str) -> str:
     n = len(flags)
     headline = (
         f"{n} subtitle mistake{'s' if n != 1 else ''} to review"
@@ -78,6 +79,7 @@ def _header(title: str, flags: list[CheckResult], stamp: str) -> str:
     return (
         f"<header><h1>{html.escape(title)}</h1>"
         f'<p class="sub">Subtitle mistakes to fix &middot; {html.escape(stamp)}</p>'
+        f"{_accuracy_bar(results)}"
         f'<p class="headline">{headline}</p>'
         f"{_summary_chips(flags)}"
         '<p class="note">Only the lines that need fixing are listed. For each one: '
