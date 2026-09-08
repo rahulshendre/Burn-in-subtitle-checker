@@ -224,6 +224,22 @@ def _flags_section(
     return f'<section class="flags"><h2>Flags</h2>{cards}</section>'
 
 
+def _suggestion_html(r: CheckResult) -> str:
+    from subtitle_checker.report.suggest import suggest_correction
+    s = suggest_correction(r)
+    if s.confident:
+        conf_html = (
+            f' <span class="suggest-conf">(match score: {s.asr_confidence:.0%})</span>'
+            if s.asr_confidence is not None else ""
+        )
+        return (
+            f'<div class="suggest"><h4>{html.escape(s.heading)}{conf_html}</h4>'
+            f'<p class="deva suggest-text">{html.escape(s.text)}</p>'
+            f'<p class="suggest-note">{html.escape(s.note)}</p></div>'
+        )
+    return f'<p class="suggest-none">{html.escape(s.note)}</p>'
+
+
 def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     color = _VERDICT_COLOR[r.verdict]
     frame = _frame_html(evidence.frame_png((r.start + r.end) / 2.0))
@@ -247,6 +263,7 @@ def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
         f'<div class="col"><h4>Written ({source_label})</h4><p class="deva">{written}</p></div>'
         f'<div class="col"><h4>Heard (ASR)</h4><p class="deva">{heard}</p></div>'
         f"</div>"
+        f"{_suggestion_html(r)}"
         f'<p class="reason">{html.escape(r.reason)}</p>{audio}'
         f"</div></div></article>"
     )
@@ -710,6 +727,17 @@ _STYLE = """<style>
   td.why { color:#777; font-size:.88rem; }
   .thumb-img { width:150px; border-radius:3px; display:block; }
   td audio { width:190px; height:30px; margin:0; }
+  .suggest { margin:.7rem 0 .5rem; padding:.6rem .8rem; background:#eef7f0;
+             border:1px solid #cfe8d8; border-radius:5px; }
+  .suggest h4 { margin:0 0 .25rem; font-size:.75rem; text-transform:uppercase;
+                letter-spacing:.04em; color:#2a7; }
+  .suggest-text { margin:0; font-weight:600; }
+  .suggest-note { margin:.3rem 0 0; color:#678; font-size:.82rem; }
+  .suggest-none { margin:.7rem 0 .5rem; padding:.55rem .8rem; background:#f6f6f6;
+                  border:1px solid #e4e4e4; border-radius:5px; color:#777;
+                  font-size:.88rem; }
+  .suggest-conf { font-weight:normal; font-size:.8rem; color:#555;
+                  text-transform:none; letter-spacing:0; }
   .acc-bar { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .6rem;
              margin:.5rem 0 .8rem; padding:.55rem .8rem; background:#f5f9f6;
              border:1px solid #cfe8d8; border-radius:6px; font-size:.92rem; }

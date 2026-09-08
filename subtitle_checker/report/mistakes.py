@@ -153,8 +153,12 @@ def _suggestion_html(r: CheckResult) -> str:
     """
     s = suggest_correction(r)
     if s.confident:
+        conf_html = (
+            f' <span class="suggest-conf">(match score: {s.asr_confidence:.0%})</span>'
+            if s.asr_confidence is not None else ""
+        )
         return (
-            f'<div class="suggest"><h4>{html.escape(s.heading)}</h4>'
+            f'<div class="suggest"><h4>{html.escape(s.heading)}{conf_html}</h4>'
             f'<p class="deva suggest-text">{html.escape(s.text)}</p>'
             f'<p class="suggest-note">{html.escape(s.note)}</p></div>'
         )

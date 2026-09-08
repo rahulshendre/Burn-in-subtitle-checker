@@ -41,12 +41,15 @@ class Suggestion:
     explains why the tool declined to guess. ``heading`` is the label the card
     shows above the text, so a corrected line and a filled-in missing line read
     differently ("Suggested correction" vs "Audio says (best guess)").
+    ``asr_confidence`` is the ASR word-match score (0-1) for this span, shown
+    on the suggestion so the editor knows how much to trust it. None when unknown.
     """
 
     text: str
     confident: bool
     note: str
     heading: str = "Suggested correction"
+    asr_confidence: float | None = None
 
 
 # Shown when the tool will not guess a correction. Honest by design: an editor
@@ -80,12 +83,11 @@ def suggest_correction(r: CheckResult) -> Suggestion:
     """
     heard = r.heard_text.strip()
     enough = len(heard.split()) >= MIN_HEARD_WORDS
+    conf = r.score if r.score is not None else None
     if r.verdict is Verdict.MISSING_SUBTITLE:
         if enough:
-            return Suggestion(heard, True, _MISSING_NOTE, heading=_MISSING_HEADING)
-        # Speech was there but nothing usable was heard - still needs a caption.
+            return Suggestion(heard, True, _MISSING_NOTE, heading=_MISSING_HEADING, asr_confidence=conf)
         return Suggestion("", False, _MISSING_NO_TRANSCRIPT)
     if r.verdict is Verdict.TEXT_MISMATCH and enough:
-        return Suggestion(heard, True, _CORRECTION_NOTE)
-    # Orphan / uncheckable, or a mismatch with no usable transcript.
+        return Suggestion(heard, True, _CORRECTION_NOTE, asr_confidence=conf)
     return Suggestion("", False, _NO_SUGGESTION)
