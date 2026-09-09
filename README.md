@@ -28,7 +28,7 @@ pipeline against planted errors.
 ## Where the code is
 
 The work is built stage by stage, each on its own reviewable branch. The
-branches stack, so the tip branch `feat/ocr-describe-guard` contains the full
+branches stack, so the tip branch `feat/accuracy-stats` contains the full
 current pipeline.
 
 | Branch | What it adds |
@@ -49,12 +49,22 @@ current pipeline.
 | `feat/saaras-v3-asr` | move the Sarvam ASR cross-check to Saaras v3 |
 | `feat/combined-score` | fuse OCR and audio confidence into one per-line score |
 | `feat/legibility-score` | per-line contrast, whole-video legibility grade, time bands |
-| `feat/ocr-describe-guard` | guard against OCR describe-mode and unreadable lines (current tip) |
+| `feat/ocr-describe-guard` | guard against OCR describe-mode and unreadable lines |
+| `feat/legibility-hide-clear` | list only sub-Clear lines as least legible |
+| `feat/guideline-compliance` | check subtitles against the guideline caps |
+| `feat/asr-short-line-floor` | do not flag a mismatch on a line too short to trust |
+| `feat/ocr-strip-logo` | strip a channel logo merged into a Devanagari line |
+| `feat/legibility-recommendations` | actionable "how to improve legibility" tips |
+| `feat/script-check` | check audio against an authored SRT/VTT file, no OCR |
+| `feat/saaras-v4-asr` | move the Sarvam ASR cross-check to Saaras v4 |
+| `feat/mistakes-page` | mistakes-only page and suggested correction per flag |
+| `feat/suggest-missing-text` | transcribe missing-subtitle spans for a best-guess caption |
+| `feat/accuracy-stats` | accuracy numbers in the report, match score on suggestions (current tip) |
 
 ## Development
 
 ```bash
-git checkout feat/ocr-describe-guard
+git checkout feat/accuracy-stats
 pip install -e ".[dev]"
 ruff check .
 pytest
