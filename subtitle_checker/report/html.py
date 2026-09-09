@@ -95,7 +95,7 @@ def render_report(
     ``legibility``, when supplied, adds the whole-video presentation grade and
     its least legible lines - a channel-facing read separate from the mismatch
     check. ``source_label`` names where the written text came from - "OCR" for
-    the burn-in pipeline, "script" for the audio-vs-script pipeline that reads an
+    the burn-in pipeline, "SRT" for the audio-vs-SRT pipeline that reads an
     authored subtitle file instead of pixels.
     """
     flags = [r for r in results if r.verdict is not Verdict.OK]

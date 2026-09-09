@@ -84,17 +84,17 @@ def test_document_is_self_contained_html():
 def test_source_label_defaults_to_ocr():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
     assert "Written (OCR)" in out
-    assert "Written (script)" not in out
+    assert "Written (SRT)" not in out
 
 
-def test_source_label_script_relabels_written_and_score():
+def test_source_label_srt_relabels_written_and_score():
     out = render_report(
-        _sample(), FakeEvidence(), title="Demo", source_label="script"
+        _sample(), FakeEvidence(), title="Demo", source_label="SRT"
     )
-    assert "Written (script)" in out
+    assert "Written (SRT)" in out
     assert "Written (OCR)" not in out
     # the score breakdown names the source too, not "OCR"
-    assert "script 60%" in out
+    assert "SRT 60%" in out
     assert "OCR 60%" not in out
 
 

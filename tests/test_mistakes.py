@@ -159,9 +159,9 @@ def test_null_evidence_degrades():
     assert "<audio" not in out
 
 
-def test_script_source_label():
-    out = render_mistakes(_sample(), FakeEvidence(), title="Demo", source_label="script")
-    assert "Written (script)" in out
+def test_srt_source_label():
+    out = render_mistakes(_sample(), FakeEvidence(), title="Demo", source_label="SRT")
+    assert "Written (SRT)" in out
     assert "Written (OCR)" not in out
 
 

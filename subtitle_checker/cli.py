@@ -295,8 +295,8 @@ def _run_script_audio_checks(video: Path, events: list, out_dir: Path, lang: str
     _print_flags(results)
     _write_report(
         video, results, out_dir,
-        title=f"Audio vs script - {video.stem}",
-        source_label="script",
+        title=f"Audio vs SRT - {video.stem}",
+        source_label="SRT",
     )
 
 

@@ -148,10 +148,10 @@ def align_script(
 
         if ratio >= min_ratio:
             verdict = Verdict.OK
-            reason = f"heard words match the script (match {ratio:.0f}%)"
+            reason = f"heard words match the SRT (match {ratio:.0f}%)"
         else:
             verdict = Verdict.TEXT_MISMATCH
-            reason = f"heard words differ from the script (match {ratio:.0f}%)"
+            reason = f"heard words differ from the SRT (match {ratio:.0f}%)"
 
         results.append(
             CheckResult(
