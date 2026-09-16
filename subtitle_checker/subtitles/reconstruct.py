@@ -9,6 +9,7 @@ resolution.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from subtitle_checker.artifacts import SubtitleEvent
@@ -91,7 +92,33 @@ def reconstruct_subtitles(
                 line_height_frac=line_height_frac(crop, raw.line_count or 1, frame_h),
             )
         )
-    return subtitles
+    return _merge_repeated(subtitles)
+
+
+# A subtitle that briefly flickers off (a dropped frame or two mid-display)
+# splits into two events with the same text a fraction of a second apart. A real
+# repeated line sits further apart, so only bridge a short gap.
+_REPEAT_GAP_S = 0.6
+
+
+def _merge_repeated(events: list[SubtitleEvent]) -> list[SubtitleEvent]:
+    """Collapse consecutive events with identical text separated by a small gap.
+
+    One subtitle split by a flicker becomes one span again, and a span the split
+    kept under the mismatch floor can clear it once rejoined. Text must match
+    exactly - different OCR readings stay separate.
+    """
+    if not events:
+        return events
+    merged = [events[0]]
+    for ev in events[1:]:
+        prev = merged[-1]
+        if ev.text and ev.text == prev.text and ev.start - prev.end <= _REPEAT_GAP_S:
+            # Keep the earlier event's readings; only stretch the end forward.
+            merged[-1] = replace(prev, end=ev.end)
+        else:
+            merged.append(ev)
+    return merged
 
 
 # native-resolution pixels of context left around the text crop
