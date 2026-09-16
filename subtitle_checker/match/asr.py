@@ -33,12 +33,12 @@ SAMPLE_RATE = 16_000
 # A little grace so the first/last word of a line is not clipped from the window.
 WINDOW_PAD_S = 0.3
 # token_set_ratio is 0-100. Live Sarvam on real audio: correct lines cluster
-# 82-100, gross divergence ~30, and single-word swaps sit at 75-93 - overlapping
-# correct, because OCR and ASR already disagree ~15% on spelling and word order.
-# So the cut flags only gross mismatches: it spares correct lines and misses
-# subtle single-word swaps (those are surfaced heard-vs-written in the report for
-# the editor, not auto-flagged - no full-line text metric separates them).
-MIN_TOKEN_RATIO = 65.0
+# 82-100, gross divergence ~30, and single-word swaps sit at 75-93. The cut at 80
+# catches gross mismatches and most single-word swaps; the cost is that a correct
+# line the ASR misheard on noisy audio (scoring just under 80) can be flagged, so
+# the flag is a "please check" not a certain error. A short version of such a line
+# (under MIN_MISMATCH_SPAN) is held back to UNCHECKABLE rather than flagged.
+MIN_TOKEN_RATIO = 80.0
 # Match alignment's trust gates: do not cross-check garbled OCR or tiny lines.
 MIN_OCR_CONF = 0.5
 MIN_WORDS = 3
@@ -206,8 +206,13 @@ def transcribe_lines(
             verdict = Verdict.OK
             reason = f"heard words match the subtitle (match {ratio:.0f}%)"
         elif event.end - event.start < min_span:
-            verdict = Verdict.OK
-            reason = f"line too short to flag a mismatch (match {ratio:.0f}%)"
+            # The words diverge, but the caption is too short for the ASR to
+            # transcribe reliably - not enough audio to accuse a subtitle. So
+            # this is not a mismatch (we do not flag it) and not a match either
+            # (the words differ). It is unverifiable: surfaced for a human to
+            # listen, kept out of the "matching" list and the accuracy rate.
+            verdict = Verdict.UNCHECKABLE
+            reason = f"line too short to verify against the audio (match {ratio:.0f}%)"
         else:
             verdict = Verdict.TEXT_MISMATCH
             reason = f"heard words differ from the subtitle (match {ratio:.0f}%)"

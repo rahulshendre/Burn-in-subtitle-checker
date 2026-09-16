@@ -107,11 +107,12 @@ def test_short_line_mismatch_is_not_flagged() -> None:
 
 
 def test_short_line_mismatch_still_shown_in_ledger() -> None:
-    # Held back from the flags, but still an OK ledger row so the editor sees
-    # the heard-vs-written and its match percentage.
+    # Held back from the flags (not a TEXT_MISMATCH), but the words do not match
+    # either - too short to verify. It becomes UNCHECKABLE so the editor still
+    # sees the heard-vs-written, without it sitting in the "matching" list.
     rows = transcribe_lines([SHORT_LINE], AUDIO, SPEECH, ScriptedAsr("पाँच छह सात आठ"))
     assert len(rows) == 1
-    assert rows[0].verdict is Verdict.OK
+    assert rows[0].verdict is Verdict.UNCHECKABLE
     assert rows[0].heard_text == "पाँच छह सात आठ"
     assert "too short" in rows[0].reason
 
