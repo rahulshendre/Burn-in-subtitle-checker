@@ -9,6 +9,7 @@ from subtitle_checker.report.app import (
     Job,
     load_key,
     past_runs,
+    render_app,
     resolve_inside,
     safe_name,
     save_key,
@@ -66,6 +67,24 @@ def test_past_runs_lists_reports_with_mistakes_pages(tmp_path):
     assert runs[0]["mistakes"].endswith("Clip_mistakes.html")
 
 
+def test_render_app_asks_for_key_until_one_is_saved():
+    no_key = render_app([], has_key=False)
+    assert 'id="keycard"' in no_key
+    assert 'id="run" disabled' in no_key
+    assert "No checks yet" in no_key
+
+    with_key = render_app([], has_key=True)
+    assert 'id="keycard"' not in with_key
+    assert 'id="run">' in with_key
+    assert "Marathi" in with_key
+
+
+def test_render_app_lists_past_runs():
+    runs = [{"label": "Mann", "report": "runs/a/Mann_report.html",
+             "mistakes": "runs/a/Mann_mistakes.html", "when": 0.0}]
+    page = render_app(runs, has_key=True)
+    assert "/file/runs/a/Mann_report.html" in page
+    assert ">mistakes<" in page
 
 
 def test_run_check_records_report_and_cleans_uploads(tmp_path, monkeypatch):

@@ -126,6 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Transcript (SRT) filename shown per video, in order (repeatable)",
     )
 
+    app = subparsers.add_parser(
+        "app", help="Open the local app: upload a video, run the check, view reports"
+    )
+    app.add_argument("--home", help="Folder for runs and settings (default: ~/Subtitle Checker)")
+    app.add_argument("--port", type=int, default=8000, help="Local port to serve on")
+    app.add_argument("--no-open", action="store_true", help="Do not open a browser window")
+
     return parser
 
 
@@ -149,6 +156,12 @@ def main(argv: list[str] | None = None) -> int:
         return _run_eval_alignment(args)
     if args.command == "ui":
         return _run_ui(args)
+    if args.command == "app":
+        from subtitle_checker.report.app import serve_app
+
+        serve_app(Path(args.home) if args.home else None, port=args.port,
+                  open_browser=not args.no_open)
+        return 0
 
     parser.print_help()
     return 0
