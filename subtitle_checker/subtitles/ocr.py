@@ -99,9 +99,12 @@ SARVAM_VISION_BACKOFF_S = 2.0
 # is grayscale, showing pearl garlands on a hand). That caption is not a
 # subtitle and must not become a subtitle line. It carries give-away markers a
 # dialogue line never has: an English rendering term reported in the OCR
-# output, or an image/scene referent that opens the sentence.
+# output, or an image/scene referent that opens the sentence. On Marathi bands
+# the narration comes back in Marathi (`प्रतिमामध्ये ... दिसत आहे`), so the
+# Marathi referents sit alongside the Hindi ones.
 _DESCRIBE_MARKERS = (
     "ग्रेस्केल",  # grayscale, transliterated
+    "कृष्णधवल",  # black-and-white, Marathi
     "grayscale",
     "greyscale",
     "black and white",
@@ -114,18 +117,31 @@ _DESCRIBE_OPENERS = (
     "इस तस्वीर",
     "छवि में",  # in the image ...
     "तस्वीर में",  # in the picture ...
+    "प्रतिमामध्ये",  # Marathi: in the image ...
+    "प्रतिमे",  # stem: प्रतिमेत / प्रतिमेमध्ये
+    "या प्रतिमे",
+    "या चित्रात",  # Marathi: in this picture ...
+    "या छायाचित्रात",  # Marathi: in this photograph ...
+    "चित्रात",
 )
+# A narration runs to several sentences; one burned subtitle block never does
+# (the guidelines cap a whole screen at 70 characters). Past this length a
+# block is a description whatever language or opener it uses.
+_DESCRIBE_MIN_CHARS = 150
 
 
 def _is_image_description(text: str) -> bool:
     """True when Sarvam Vision narrated the frame instead of reading a subtitle.
 
     Recognised by markers a dialogue subtitle never carries: an English
-    rendering term anywhere in the text (`black and white`, `grayscale`), or an
-    image/scene referent that opens the sentence (`यह छवि ...`, `यह दृश्य ...`).
+    rendering term anywhere in the text (`black and white`, `grayscale`), an
+    image/scene referent that opens the sentence (`यह छवि ...`, `यह दृश्य ...`,
+    Marathi `प्रतिमामध्ये ...`), or a length no single subtitle block reaches.
     Kept tight - the openers must lead - so a line that merely mentions an image
     is not mistaken for a caption.
     """
+    if len(text.strip()) > _DESCRIBE_MIN_CHARS:
+        return True
     low = text.lower()
     if any(m in low for m in _DESCRIBE_MARKERS):
         return True

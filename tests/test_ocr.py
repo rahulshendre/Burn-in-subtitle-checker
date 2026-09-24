@@ -70,6 +70,24 @@ def test_flags_image_description_captions():
     assert _is_image_description("यह दृश्य किसी पारंपरिक भारतीय शादी का है।")
 
 
+def test_flags_marathi_image_description_captions():
+    # Real Sarvam narrations from the Marathi No-SLS clip (no subtitle on screen)
+    assert _is_image_description("प्रतिमामध्ये पांढऱ्या शर्टावर चांदीच्या रंगाचे दोन साखळ्यांचे हार घातलेले दिसत आहेत.")
+    assert _is_image_description("या चित्रात एक बागेचा देखावा आहे.")
+    assert _is_image_description("या प्रतिमेमध्ये दोन चांदीच्या साखळ्या दिसत आहेत.")
+    assert _is_image_description("या कृष्णधवल छायाचित्रात एक व्यक्ती खुर्चीवर बसलेली दिसत आहे.")
+
+
+def test_flags_overlong_block_as_description():
+    # No single burned subtitle block runs past the length cap, whatever its opener
+    assert _is_image_description("एक व्यक्ती बसलेली आहे. " * 8)
+
+
+def test_keeps_marathi_dialogue():
+    assert not _is_image_description("माझ्या पावलावर पाऊल टाकू नगसं.")
+    assert not _is_image_description("बाकी अजून काय समजावून सांगायचं तुम्हाला दुष्यंत सरकार?")
+
+
 def test_keeps_dialogue_that_merely_mentions_an_image():
     # A line is only a caption when a referent opens it, not when one appears
     assert not _is_image_description("मेरी छवि आईने में धुंधली थी।")
