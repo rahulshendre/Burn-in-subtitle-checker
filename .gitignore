@@ -15,6 +15,7 @@ out/
 *.pt
 *.pth
 *.onnx
+!subtitle_checker/audio/models/silero_vad.onnx
 
 # Secrets — API keys never committed
 .env

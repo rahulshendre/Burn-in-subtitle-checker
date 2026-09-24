@@ -14,8 +14,8 @@ dependencies = ["numpy>=1.26,<3", "rapidfuzz>=3.0"]
 dev = ["pytest>=8.0", "ruff>=0.5"]
 # OCR pulls in torch (~2 GB) - separate extra so CI and audio-only work skip it
 ocr = ["easyocr==1.7.2"]
-# VAD also rides on torch - its own extra so OCR-only work skips it
-audio = ["silero-vad>=5.1"]
+# VAD runs Silero's ONNX export (shipped in the package) on onnxruntime - no torch
+audio = ["onnxruntime>=1.17"]
 # Forced alignment rides on torchaudio + uroman (romanizes Indic text for the
 # Latin MMS dictionary) - its own extra so OCR/VAD-only work skips the download
 align = ["torchaudio>=2.1", "uroman>=1.2"]
@@ -32,6 +32,9 @@ subtitle-checker = "subtitle_checker.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["subtitle_checker*"]
+
+[tool.setuptools.package-data]
+"subtitle_checker.audio" = ["models/*"]
 
 [tool.ruff]
 line-length = 100

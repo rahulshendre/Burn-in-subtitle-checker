@@ -501,8 +501,8 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
     from subtitle_checker.match.structural import check_structural
 
     try:
-        from subtitle_checker.audio.vad import SileroVad
-        vad = SileroVad()
+        from subtitle_checker.audio.vad import SileroOnnxVad
+        vad = SileroOnnxVad()
         audio = extract_audio(video)
         regions = label_regions(audio, vad)
     except ImportError:
