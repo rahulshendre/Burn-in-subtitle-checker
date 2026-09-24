@@ -264,7 +264,9 @@ def _sarvam_vision_blocks(client, band: np.ndarray, lang: str) -> list[str]:
 
     from PIL import Image
 
-    with tempfile.TemporaryDirectory() as tmp:
+    # Windows cannot delete a file the SDK may still hold open; a leftover temp
+    # file must not fail the OCR.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         tmp = Path(tmp)
         png = tmp / "band.png"
         Image.fromarray(band).save(png)

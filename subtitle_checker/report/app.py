@@ -22,6 +22,7 @@ import io
 import json
 import os
 import re
+import sys
 import threading
 import time
 import webbrowser
@@ -375,6 +376,12 @@ $('quit').onclick=function(){
 """
 
 
+class _Server(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second process bind a port that is already
+    # in use, which would hide a running app; the busy-port check needs it off.
+    allow_reuse_address = sys.platform != "win32"
+
+
 def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRequestHandler]:
     uploads = home / "uploads"
 
@@ -470,7 +477,7 @@ def serve_app(
     handler = _make_handler(home, Job(), threading.Lock())
     url = f"http://{host}:{port}/"
     try:
-        httpd = ThreadingHTTPServer((host, port), handler)
+        httpd = _Server((host, port), handler)
     except OSError:
         # Opened a second time while already running: show the running app.
         print(f"Subtitle Checker is already running at {url}")

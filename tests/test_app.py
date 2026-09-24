@@ -169,3 +169,9 @@ def test_render_app_has_a_quit_button():
     page = render_app([], has_key=True)
     assert 'id="quit"' in page
     assert "/quit" in page
+
+
+def test_server_refuses_port_sharing_on_windows():
+    import sys
+
+    assert app._Server.allow_reuse_address == (sys.platform != "win32")
