@@ -196,6 +196,9 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
     args = argparse.Namespace(
         video=str(video), lang=lang, out=str(out_dir), asr=True, ocr="sarvam-vision",
         script=str(srt) if srt else None,
+        # The ASR check overrides every alignment flag (0 of 48 survived on five
+        # real clips), so the app skips the 1.2 GB alignment model entirely.
+        no_align=True,
     )
     writer = _StageWriter(job)
     try:

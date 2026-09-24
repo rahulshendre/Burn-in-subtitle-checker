@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="OCR engine: easyocr (on-device default) or sarvam-vision "
         "(cloud quality engine, needs SARVAM_API_KEY)",
     )
+    check.add_argument(
+        "--no-align",
+        action="store_true",
+        help="Skip the forced-alignment step (its 1.2 GB model); with --asr the ASR "
+        "check overrides every alignment flag anyway",
+    )
 
     cs = subparsers.add_parser(
         "check-script",
@@ -237,7 +243,10 @@ def _run_check(args: argparse.Namespace) -> int:
 
     _print_legibility(events)
     _print_compliance(events)
-    _run_audio_checks(video, events, out_dir, args.lang, args.asr)
+    _run_audio_checks(
+        video, events, out_dir, args.lang, args.asr,
+        run_align=not getattr(args, "no_align", False),
+    )
     return 0
 
 
@@ -493,7 +502,9 @@ def _resolve_results(path: Path, video: Path) -> Path | None:
     return None
 
 
-def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_asr: bool) -> None:
+def _run_audio_checks(
+    video: Path, events: list, out_dir: Path, lang: str, run_asr: bool, run_align: bool = True
+) -> None:
     """Stage 2 + 3: label the audio, raise flags, transcribe lines, write the report."""
     from subtitle_checker.artifacts import save_artifact
     from subtitle_checker.audio.regions import label_regions
@@ -511,7 +522,8 @@ def _run_audio_checks(video: Path, events: list, out_dir: Path, lang: str, run_a
 
     save_artifact(out_dir / f"{video.stem}_audio_regions.json", "audio_regions", regions)
     flags = check_structural(events, regions)
-    flags += _alignment_flags(events, audio, regions, lang)
+    if run_align:
+        flags += _alignment_flags(events, audio, regions, lang)
     results = flags
     if run_asr:
         results = _merge_results(flags, _asr_ledger(events, audio, regions, lang))
