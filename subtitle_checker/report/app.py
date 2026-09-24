@@ -366,6 +366,11 @@ $('run').onclick=function(){
     poll();}).catch(function(e){fail(e.message);});};
 fetch('/job').then(function(r){return r.json();}).then(function(j){
   if(j.state==='running'){$('run').disabled=true;poll();}});
+$('quit').onclick=function(){
+  fetch('/job').then(function(r){return r.json();}).then(function(j){
+    if(j.state==='running'&&!confirm('A check is running. Quit anyway?')){return;}
+    fetch('/quit',{method:'POST'}).then(function(){document.body.innerHTML=
+      '<p style="padding:2rem">Subtitle Checker has closed. You can close this tab.</p>';});});};
 })();
 """
 
