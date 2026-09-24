@@ -1,0 +1,25 @@
+Subtitle Checker - how to install and use (Mac)
+================================================
+
+Needs: an Apple Silicon Mac (M1/M2/M3/M4), internet, and the Sarvam API key
+(you get it separately).
+
+Install
+1. Unzip Subtitle-Checker-mac.zip and drag "Subtitle Checker" into Applications.
+2. Double-click it. macOS says it cannot check the app for malware - click Done.
+3. Open System Settings > Privacy & Security, scroll down, click "Open Anyway"
+   next to Subtitle Checker, and confirm. You only do this once.
+
+Use
+1. Open Subtitle Checker. A page opens in your browser.
+2. First time only: paste the Sarvam API key and click Save.
+3. Choose a video, pick the language, click "Run check". Keep the page open;
+   the bar shows how far it has got.
+4. The report opens when it is done. Old reports stay under "Past checks".
+5. Click "Quit app" (top right) when you are finished.
+
+Where things are: your reports are in the "Subtitle Checker" folder in your
+home folder. If something goes wrong, send the app.log file from that folder.
+
+Privacy: the video stays on your computer. Only small cropped subtitle images
+and short audio clips are sent to Sarvam to read and listen.
