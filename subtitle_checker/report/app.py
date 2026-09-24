@@ -267,7 +267,8 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         '<button id="savekey">Save</button></div></section>'
     )
     body = (
-        f'<div class="bar"><div class="brand">{html.escape(title)}</div></div>'
+        f'<div class="bar"><div class="brand">{html.escape(title)}</div>'
+        '<button id="quit" class="quit">Quit app</button></div>'
         '<main class="wrap">'
         + ("" if has_key else key_card)
         + '<section class="card"><h2>New check</h2>'
@@ -319,6 +320,7 @@ _APP_STYLE = """<style>
   .runs li { padding:.45rem 0; border-bottom:1px solid #eef; }
   .runs a { color:#1f6f43; font-weight:600; } .runs a.sub { font-weight:400; font-size:.85rem; }
   .when { float:right; color:#889; font-size:.8rem; }
+  .quit { background:transparent; border:1px solid rgba(255,255,255,.6); font-weight:400; }
 </style>"""
 
 _SCRIPT = """
@@ -406,6 +408,9 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
                 if key:
                     save_key(home, key)
                 self._send(200, b"ok", "text/plain")
+            elif self.path == "/quit":
+                self._send(200, b"bye", "text/plain")
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
             elif self.path == "/run":
                 self._start(json.loads(self.rfile.read(length) or b"{}"))
             else:
@@ -458,10 +463,17 @@ def serve_app(
     home.mkdir(parents=True, exist_ok=True)
     load_key(home)
     handler = _make_handler(home, Job(), threading.Lock())
-    httpd = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
+    try:
+        httpd = ThreadingHTTPServer((host, port), handler)
+    except OSError:
+        # Opened a second time while already running: show the running app.
+        print(f"Subtitle Checker is already running at {url}")
+        if open_browser:
+            webbrowser.open(url)
+        return
     print(f"Subtitle Checker running at {url}  (files in {home})")
-    print("Keep this window open while you use the app. Press Ctrl+C to stop.")
+    print("Stop it with the Quit app button on the page (or Ctrl+C here).")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
