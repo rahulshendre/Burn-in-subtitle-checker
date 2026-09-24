@@ -1,0 +1,27 @@
+Subtitle Checker - how to install and use (Windows)
+====================================================
+
+Needs: a 64-bit Windows 10 or 11 PC, internet, and the Sarvam API key (you get
+it separately).
+
+Install
+1. Right-click Subtitle-Checker-windows.zip > Extract All. Keep the extracted
+   "Subtitle Checker" folder somewhere handy (e.g. Documents).
+2. Open the folder and double-click "Subtitle Checker.exe".
+3. If Windows says "Windows protected your PC", click "More info" then
+   "Run anyway". You only do this once.
+
+Use
+1. Open Subtitle Checker. A page opens in your browser.
+2. First time only: paste the Sarvam API key and click Save.
+3. Choose a video, pick the language, click "Run check". Keep the page open;
+   the bar shows how far it has got.
+4. The report opens when it is done. Old reports stay under "Past checks".
+5. Click "Quit app" (top right) when you are finished.
+
+Where things are: your reports are in the "Subtitle Checker" folder in your
+user folder (C:\Users\<you>\Subtitle Checker). If something goes wrong, send the
+app.log file from that folder.
+
+Privacy: the video stays on your computer. Only small cropped subtitle images
+and short audio clips are sent to Sarvam to read and listen.

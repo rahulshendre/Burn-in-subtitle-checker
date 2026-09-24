@@ -1,4 +1,4 @@
-"""Entry point of the packaged Mac app.
+"""Entry point of the packaged app (Mac and Windows).
 
 A double-clicked app has no terminal, so the bundled ffmpeg/ffprobe are put on
 PATH here and all output goes to a log file in the app's folder, where a tester

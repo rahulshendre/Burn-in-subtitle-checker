@@ -34,7 +34,7 @@ done
   --add-binary "$WORK/bin/ffprobe:bin" \
   --collect-data subtitle_checker \
   --collect-submodules subtitle_checker \
-  "$ROOT/packaging/macos/launcher.py"
+  "$ROOT/packaging/launcher.py"
 
 cd "$ROOT/dist"
 rm -f Subtitle-Checker-mac.zip
