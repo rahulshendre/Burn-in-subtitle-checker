@@ -6,6 +6,7 @@ watching the whole file.
 
 Built for PlanetRead's Same Language Subtitling (SLS) content under C4GT DMP
 2026, issue [#3](https://github.com/PlanetRead/Burn-in-subtitle-checker/issues/3).
+Works on Hindi and Marathi videos today.
 
 ## The idea
 
@@ -25,52 +26,84 @@ Each stage reads and writes a JSON artifact, so a stage can be cached, re-run,
 or swapped without touching the others. A separate evaluation harness scores the
 pipeline against planted errors.
 
+Alongside the mismatch check, the report grades how legible the subtitles are
+(by contrast against the picture), suggests fixes for the weakest lines (more
+contrast, bigger text) and checks the subtitles against PlanetRead's subtitle
+guidelines.
+
+## Ways to run it
+
+- **Desktop app (Mac and Windows).** A double-click app that opens a page in
+  the browser: pick a video, pick the language, run the check, read the
+  report. The video stays on the computer; only cropped subtitle images and
+  short audio clips go to Sarvam. Needs a Sarvam API key.
+  - Mac (Apple Silicon): `packaging/macos/build.sh` builds `Subtitle Checker.app`.
+  - Windows (64-bit): the `windows` GitHub Actions workflow builds
+    `Subtitle-Checker-Setup.exe`, installs it on a Windows runner and checks it
+    starts. `packaging/windows/build.ps1` does the same build by hand.
+- **Command line.**
+
+  ```bash
+  export SARVAM_API_KEY=...
+  subtitle-checker check --video clip.mp4 --lang hi --ocr sarvam-vision --asr
+  subtitle-checker app   # the same local app, started from a terminal
+  ```
+
 ## Where the code is
 
 The work is built stage by stage, each on its own reviewable branch. The
-branches stack, so the tip branch `feat/accuracy-stats` contains the full
-current pipeline.
+branches stack in the order below, so the tip branch `feat/windows-app`
+contains everything.
 
-| Branch | What it adds |
-|--------|--------------|
-| `feat/package-skeleton` | package layout, JSON artifacts, CLI, CI |
-| `feat/eval-harness` | error injector and scoring harness (the ground truth) |
-| `feat/subtitle-events` | Stage 1: subtitle detection and OCR |
-| `feat/audio-regions` | Stage 2: speech / music / silence and structural checks |
-| `feat/forced-alignment` | Stage 3: forced alignment and Sarvam ASR cross-check |
-| `feat/report` | Stage 4: self-contained HTML editor report |
-| `feat/ocr-junk-filter` | drop OCR junk boxes from logo and chrome leakage |
-| `feat/region-chrome` | drop animated channel logos via region presence |
-| `feat/coverage-metric` | measure how many lines Stage 3 actually verifies |
-| `feat/align-rescue` | verify low-confidence lines that align strongly |
-| `feat/web-ui` | minimal local web UI to browse reports |
-| `feat/sarvam-vision-ocr` | Sarvam Vision as an opt-in higher-quality OCR engine |
-| `feat/matra-defect` | matra-swap error injection and heard-vs-written highlighting |
-| `feat/saaras-v3-asr` | move the Sarvam ASR cross-check to Saaras v3 |
-| `feat/combined-score` | fuse OCR and audio confidence into one per-line score |
-| `feat/legibility-score` | per-line contrast, whole-video legibility grade, time bands |
-| `feat/ocr-describe-guard` | guard against OCR describe-mode and unreadable lines |
-| `feat/legibility-hide-clear` | list only sub-Clear lines as least legible |
-| `feat/guideline-compliance` | check subtitles against the guideline caps |
-| `feat/asr-short-line-floor` | do not flag a mismatch on a line too short to trust |
-| `feat/ocr-strip-logo` | strip a channel logo merged into a Devanagari line |
-| `feat/legibility-recommendations` | actionable "how to improve legibility" tips |
-| `feat/script-check` | check audio against an authored SRT/VTT file, no OCR |
-| `feat/saaras-v4-asr` | move the Sarvam ASR cross-check to Saaras v4 |
-| `feat/mistakes-page` | mistakes-only page and suggested correction per flag |
-| `feat/suggest-missing-text` | transcribe missing-subtitle spans for a best-guess caption |
-| `feat/accuracy-stats` | accuracy numbers in the report, match score on suggestions (current tip) |
+| # | Branch | What it adds |
+|--:|--------|--------------|
+| 1 | `feat/package-skeleton` | package layout, JSON artifacts, CLI, CI |
+| 2 | `feat/eval-harness` | error injector and scoring harness (the ground truth) |
+| 3 | `feat/subtitle-events` | Stage 1: subtitle detection and OCR |
+| 4 | `feat/audio-regions` | Stage 2: speech / music / silence and structural checks |
+| 5 | `feat/forced-alignment` | Stage 3: forced alignment and Sarvam ASR cross-check |
+| 6 | `feat/report` | Stage 4: self-contained HTML editor report |
+| 7 | `feat/ocr-junk-filter` | drop OCR junk boxes from logo and chrome leakage |
+| 8 | `feat/region-chrome` | drop animated channel logos via region presence |
+| 9 | `feat/coverage-metric` | measure how many lines Stage 3 actually verifies |
+| 10 | `feat/align-rescue` | verify low-confidence lines that align strongly |
+| 11 | `feat/web-ui` | minimal local web UI to browse reports |
+| 12 | `feat/sarvam-vision-ocr` | Sarvam Vision as an opt-in higher-quality OCR engine |
+| 13 | `feat/matra-defect` | matra-swap error injection and heard-vs-written highlighting |
+| 14 | `feat/saaras-v3-asr` | move the Sarvam ASR cross-check to Saaras v3 |
+| 15 | `feat/combined-score` | fuse OCR and audio confidence into one per-line score |
+| 16 | `feat/legibility-score` | per-line contrast, whole-video legibility grade, time bands |
+| 17 | `feat/ocr-describe-guard` | guard against OCR describe-mode and unreadable lines |
+| 18 | `feat/legibility-hide-clear` | list only sub-Clear lines as least legible |
+| 19 | `feat/guideline-compliance` | check subtitles against the guideline caps |
+| 20 | `feat/asr-short-line-floor` | do not flag a mismatch on a line too short to trust |
+| 21 | `feat/ocr-strip-logo` | strip a channel logo merged into a Devanagari line |
+| 22 | `feat/legibility-recommendations` | actionable "how to improve legibility" tips |
+| 23 | `feat/script-check` | check audio against an authored SRT/VTT file, no OCR |
+| 24 | `feat/saaras-v4-asr` | move the Sarvam ASR cross-check to Saaras v4 |
+| 25 | `feat/mistakes-page` | mistakes-only page and suggested correction per flag |
+| 26 | `feat/suggest-missing-text` | transcribe missing-subtitle spans for a best-guess caption |
+| 27 | `feat/accuracy-stats` | accuracy numbers in the report, match score on suggestions |
+| 28 | `feat/short-line-uncheckable` | mark short low-match lines as uncheckable, merge flicker splits |
+| 29 | `feat/marathi` | Marathi: drop image narrations and overlong OCR blocks |
+| 30 | `feat/local-app` | desktop app (browser page, key, progress, history), Mac build |
+| 31 | `feat/windows-app` | Windows Setup.exe installer, built and tested in CI (current tip) |
 
 ## Development
 
 ```bash
-git checkout feat/accuracy-stats
-pip install -e ".[dev]"
+git checkout feat/windows-app
+pip install -e ".[dev,audio,asr,vision]"
 ruff check .
 pytest
 ```
 
-Hindi first; other languages follow once Hindi works end to end.
+Extras: `audio` (voice activity detection on onnxruntime), `asr` and `vision`
+(Sarvam speech and OCR), `ocr` (on-device EasyOCR, pulls in torch), `align`
+(forced alignment, pulls in torchaudio). The Sarvam key is read from the
+`SARVAM_API_KEY` environment variable only.
 
-Status: under active development. Pipeline stages are landing as separate,
-reviewable PRs.
+## Status
+
+Hindi and Marathi work end to end. 306 tests pass on macOS and on Windows (CI).
+The branches above are meant to be reviewed as PRs in stack order.
