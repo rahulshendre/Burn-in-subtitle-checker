@@ -8,12 +8,32 @@ can find it when something goes wrong.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
 
+def _hide_child_consoles() -> None:
+    """On Windows, keep every ffmpeg/ffprobe child from flashing a console.
+
+    The app itself has no console (PyInstaller --noconsole), so each child
+    process would otherwise open its own terminal window for a moment.
+    """
+    if sys.platform != "win32":
+        return
+    real_popen = subprocess.Popen
+
+    class _QuietPopen(real_popen):
+        def __init__(self, *args, **kwargs):
+            kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+            super().__init__(*args, **kwargs)
+
+    subprocess.Popen = _QuietPopen
+
+
 def main() -> None:
     bundle = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    _hide_child_consoles()
     os.environ["PATH"] = str(bundle / "bin") + os.pathsep + os.environ.get("PATH", "")
 
     from subtitle_checker.report.app import default_home, serve_app
