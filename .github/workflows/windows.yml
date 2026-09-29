@@ -1,9 +1,13 @@
-# Windows check and build, run by hand from the Actions tab (no Windows machine
-# needed). The tests always run on Windows; the app is packaged only when
-# "package" is ticked, and the zip is attached to the run as an artifact.
+# Windows check and build (no Windows machine needed). Runs on every push to
+# feat/windows-app, or by hand from the Actions tab once this file is on the
+# default branch. The tests and the build run side by side: the build makes
+# Subtitle-Checker-Setup.exe, installs it silently, checks the app starts and
+# serves its page, and attaches the installer to the run as an artifact.
 name: windows
 
 on:
+  push:
+    branches: [feat/windows-app]
   workflow_dispatch:
     inputs:
       package:
@@ -23,16 +27,35 @@ jobs:
       - run: python -m pytest -q
 
   package:
-    if: ${{ inputs.package }}
-    needs: test
+    if: ${{ github.event_name == 'push' || inputs.package }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - run: choco install innosetup -y --no-progress
       - run: powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
+      - name: Install and start the app
+        run: |
+          Start-Process dist\Subtitle-Checker-Setup.exe -Wait `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
+          $App = "$env:LOCALAPPDATA\Programs\Subtitle Checker"
+          $Probe = Get-ChildItem $App -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          & $Probe.FullName -hide_banner -version | Select-Object -First 1
+          Start-Process "$App\Subtitle Checker.exe"
+          $ok = $false
+          foreach ($i in 1..60) {
+            try {
+              $r = Invoke-WebRequest http://127.0.0.1:8000/ -UseBasicParsing -TimeoutSec 2
+              if ($r.StatusCode -eq 200) { $ok = $true; break }
+            } catch { Start-Sleep -Seconds 2 }
+          }
+          Stop-Process -Name "Subtitle Checker" -Force -ErrorAction SilentlyContinue
+          Get-Content "$HOME\Subtitle Checker\app.log" -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "The app did not answer on http://127.0.0.1:8000/" }
       - uses: actions/upload-artifact@v4
         with:
           name: Subtitle-Checker-windows
-          path: dist/Subtitle-Checker-windows.zip
+          path: dist/Subtitle-Checker-Setup.exe
+          if-no-files-found: error
