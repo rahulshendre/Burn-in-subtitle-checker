@@ -3,8 +3,9 @@
 #
 # Same recipe as the Mac build: a clean torch-free virtualenv (Sarvam stack,
 # ONNX VAD, no forced alignment) plus static ffmpeg/ffprobe, frozen with
-# PyInstaller. Output: dist\Subtitle Checker\ (run "Subtitle Checker.exe") and
-# dist\Subtitle-Checker-windows.zip.
+# PyInstaller, then wrapped by Inno Setup (installer.iss) into one installer.
+# Needs Inno Setup 6 (https://jrsoftware.org/isdl.php). Output:
+# dist\Subtitle Checker\ (the app folder) and dist\Subtitle-Checker-Setup.exe.
 $ErrorActionPreference = "Stop"
 
 $Root = (Resolve-Path "$PSScriptRoot\..\..").Path
@@ -36,7 +37,11 @@ if (-not (Test-Path "$Work\bin\ffmpeg.exe")) {
     "$Root\packaging\launcher.py"
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
-$Zip = Join-Path $Root "dist\Subtitle-Checker-windows.zip"
-if (Test-Path $Zip) { Remove-Item $Zip }
-Compress-Archive -Path "$Root\dist\Subtitle Checker" -DestinationPath $Zip
-Get-Item $Zip | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB) } }
+$Iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+if (-not (Test-Path $Iscc)) { throw "Inno Setup 6 not found at $Iscc" }
+$Version = (Select-String -Path "$Root\pyproject.toml" -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+& $Iscc /Q "/DAppVersion=$Version" "/DSourceDir=$Root\dist\Subtitle Checker" `
+    "/DOutputDir=$Root\dist" "$PSScriptRoot\installer.iss"
+if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+Get-Item "$Root\dist\Subtitle-Checker-Setup.exe" |
+    Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB) } }
