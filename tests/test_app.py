@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from subtitle_checker.report import app
 from subtitle_checker.report.app import (
@@ -39,7 +40,8 @@ def test_key_saved_locally_and_loaded(tmp_path, monkeypatch):
     monkeypatch.delenv(app.KEY_ENV, raising=False)
     save_key(tmp_path, "sk-test")
     assert os.environ[app.KEY_ENV] == "sk-test"
-    assert oct((tmp_path / "config.json").stat().st_mode)[-3:] == "600"
+    if sys.platform != "win32":  # Windows has no owner-only mode bits
+        assert oct((tmp_path / "config.json").stat().st_mode)[-3:] == "600"
 
     monkeypatch.delenv(app.KEY_ENV)
     load_key(tmp_path)

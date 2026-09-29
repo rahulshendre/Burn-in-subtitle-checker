@@ -1,11 +1,15 @@
 """Round-trip a synthetic tone through ffmpeg extraction."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from subtitle_checker.ingest.audio_track import SAMPLE_RATE, extract_audio
+
+pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg required")
 
 
 def _make_tone_clip(path: Path, duration: float = 2.0) -> None:
