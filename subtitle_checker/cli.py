@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -12,6 +13,27 @@ from subtitle_checker import __version__
 _UROMAN_LANG = {"hi": "hin", "kn": "kan", "mr": "mar"}
 # Sarvam wants BCP-47 codes; the CLI speaks 639-1.
 _SARVAM_LANG = {"hi": "hi-IN", "kn": "kn-IN", "mr": "mr-IN"}
+# Languages the full pipeline supports; an unknown code must stop with an error
+# rather than quietly run the Hindi models on another language.
+SUPPORTED_LANGS = tuple(_SARVAM_LANG)
+
+_NOTICES_SHOWN: set[str] = set()
+
+
+def _cloud_notice(what: str, service: str) -> None:
+    """Tell the user, once per run, which data leaves the machine and why."""
+    if what in _NOTICES_SHOWN:
+        return
+    _NOTICES_SHOWN.add(what)
+    print(f"note: {what} are sent to {service} for this step", file=sys.stderr)
+
+
+def _sarvam_asr(lang: str):
+    """Build the Sarvam ASR engine for a CLI language code, with the cloud notice."""
+    from subtitle_checker.match.asr import SarvamAsr
+
+    _cloud_notice("audio clips", "Sarvam AI (cloud speech-to-text)")
+    return SarvamAsr(lang=_SARVAM_LANG[lang])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,7 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     check = subparsers.add_parser("check", help="Run the full pipeline on a video file")
     check.add_argument("--video", required=True, help="Path to the input video")
-    check.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
+    check.add_argument(
+        "--lang", default="hi", choices=SUPPORTED_LANGS,
+        help="ISO language code (hi, kn, mr)",
+    )
     check.add_argument("--out", default="out", help="Directory for artifacts and the report")
     check.add_argument(
         "--asr",
@@ -51,7 +76,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     cs.add_argument("--video", required=True, help="Path to the input video (audio source)")
     cs.add_argument("--script", required=True, help="Authored subtitle file (SRT or VTT)")
-    cs.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
+    cs.add_argument(
+        "--lang", default="hi", choices=SUPPORTED_LANGS,
+        help="ISO language code (hi, kn, mr)",
+    )
     cs.add_argument("--out", default="out", help="Directory for artifacts and the report")
 
     leg = subparsers.add_parser(
@@ -59,7 +87,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Grade a video's subtitle legibility (Stage 1 only, no audio needed)",
     )
     leg.add_argument("--video", required=True, help="Path to the input video")
-    leg.add_argument("--lang", default="hi", help="ISO language code for OCR (hi, kn, mr)")
+    leg.add_argument(
+        "--lang", default="hi", choices=SUPPORTED_LANGS,
+        help="ISO language code for OCR (hi, kn, mr)",
+    )
     leg.add_argument("--out", default="out", help="Directory for the events artifact")
     leg.add_argument(
         "--ocr",
@@ -101,7 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Swap words on a clip's real lines and measure alignment separation",
     )
     ea.add_argument("--video", required=True, help="A real clip with burned-in subtitles")
-    ea.add_argument("--lang", default="hi", help="ISO language code (hi, kn, mr)")
+    ea.add_argument(
+        "--lang", default="hi", choices=SUPPORTED_LANGS,
+        help="ISO language code (hi, kn, mr)",
+    )
     ea.add_argument("--min-ocr-conf", type=float, default=0.5, help="Trust OCR text above this")
     ea.add_argument("--seed", type=int, default=0, help="RNG seed for the word swap")
 
@@ -199,10 +233,18 @@ def _run_ui(args: argparse.Namespace) -> int:
 def _require_video(path_str: str) -> Path | None:
     """Return the video path if it exists, else print an error and return None."""
     video = Path(path_str)
-    if video.exists():
-        return video
-    print(f"video not found: {video}", file=sys.stderr)
-    return None
+    if not video.exists():
+        print(f"video not found: {video}", file=sys.stderr)
+        return None
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None]
+    if missing:
+        print(
+            f"{' and '.join(missing)} not found on PATH. Install ffmpeg "
+            "(macOS: brew install ffmpeg; Windows: winget install ffmpeg) and try again.",
+            file=sys.stderr,
+        )
+        return None
+    return video
 
 
 def _report_title(video: Path) -> str:
@@ -219,7 +261,8 @@ def _build_ocr(name: str, lang: str):
     if name == "sarvam-vision":
         from subtitle_checker.subtitles.ocr import SarvamVisionOcr
 
-        return SarvamVisionOcr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+        _cloud_notice("subtitle frames", "Sarvam AI (cloud OCR)")
+        return SarvamVisionOcr(lang=_SARVAM_LANG[lang])
     from subtitle_checker.subtitles.ocr import EasyOcrEngine
 
     return EasyOcrEngine([lang])
@@ -310,11 +353,10 @@ def _run_script_audio_checks(video: Path, events: list, out_dir: Path, lang: str
 
     from subtitle_checker.artifacts import save_artifact
     from subtitle_checker.ingest.audio_track import extract_audio
-    from subtitle_checker.match.asr import SarvamAsr
     from subtitle_checker.match.script_align import align_script, transcribe_full
 
     audio = extract_audio(video)
-    engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+    engine = _sarvam_asr(lang)
     heard = transcribe_full(audio, engine)
     results = align_script(events, heard)
     save_artifact(out_dir / f"{video.stem}_check_results.json", "check_results", results)
@@ -572,10 +614,10 @@ def _asr_ledger(events: list, audio, regions: list, lang: str) -> list:
     if not os.environ.get("SARVAM_API_KEY"):
         print("ASR cross-check skipped - set SARVAM_API_KEY to enable it")
         return []
-    from subtitle_checker.match.asr import SarvamAsr, transcribe_lines
+    from subtitle_checker.match.asr import transcribe_lines
 
     try:
-        engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+        engine = _sarvam_asr(lang)
         return transcribe_lines(events, audio, regions, engine)
     except ImportError:
         print("ASR cross-check skipped - install the extra with: pip install '.[asr]'")
@@ -594,10 +636,10 @@ def _fill_missing_text(results: list, audio, lang: str) -> list:
 
     if not os.environ.get("SARVAM_API_KEY"):
         return results
-    from subtitle_checker.match.asr import SarvamAsr, transcribe_missing
+    from subtitle_checker.match.asr import transcribe_missing
 
     try:
-        engine = SarvamAsr(lang=_SARVAM_LANG.get(lang, "hi-IN"))
+        engine = _sarvam_asr(lang)
         return transcribe_missing(results, audio, engine)
     except ImportError:
         return results

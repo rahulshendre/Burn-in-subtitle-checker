@@ -115,3 +115,34 @@ def test_report_generates_self_contained_html(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert text.startswith("<!DOCTYPE html>")
     assert "data:image/png;base64," in text
+
+
+def test_unsupported_language_is_rejected(capsys: pytest.CaptureFixture) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        main(["check", "--video", "clip.mp4", "--lang", "ta"])
+    assert excinfo.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+
+
+def test_missing_ffmpeg_gives_a_clear_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    from subtitle_checker import cli
+
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"x")
+    monkeypatch.setattr(cli.shutil, "which", lambda _tool: None)
+    assert cli._require_video(str(video)) is None
+    err = capsys.readouterr().err
+    assert "ffmpeg and ffprobe not found" in err
+    assert "brew install ffmpeg" in err
+
+
+def test_cloud_notice_prints_once(capsys: pytest.CaptureFixture) -> None:
+    from subtitle_checker import cli
+
+    cli._NOTICES_SHOWN.clear()
+    cli._cloud_notice("audio clips", "Sarvam AI")
+    cli._cloud_notice("audio clips", "Sarvam AI")
+    err = capsys.readouterr().err
+    assert err.count("audio clips are sent to Sarvam AI") == 1
