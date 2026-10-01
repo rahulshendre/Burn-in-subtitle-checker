@@ -74,3 +74,24 @@ def test_check_compliance_counts_and_lists_violations() -> None:
     assert len(comp.violations) == 1
     assert comp.violations[0].char_count == MAX_CHARS_ON_SCREEN + 10
     assert round(comp.share, 3) == round(2 / 3, 3)
+
+
+def test_hindi_has_its_own_guidelines_other_languages_are_reference_only() -> None:
+    events = [_event("हम सब से नज़रे", line_count=1)]
+    assert check_compliance(events).reference_only is False
+    assert check_compliance(events, "hi").reference_only is False
+    assert check_compliance(events, "mr").reference_only is True
+
+
+def test_report_banner_says_marathi_uses_the_hindi_cap_as_reference() -> None:
+    from subtitle_checker.report.html import _compliance_banner
+
+    events = [_event("आणि तुला ते कधी दिसले नाही", line_count=1)]
+    marathi = _compliance_banner(check_compliance(events, "mr"))
+    hindi = _compliance_banner(check_compliance(events, "hi"))
+    assert "no published Marathi guidelines yet" in marathi
+    assert "reference only" in marathi
+    assert "fit the Hindi caps (reference)" in marathi
+    assert "follow the guidelines" not in marathi
+    assert "no published" not in hindi
+    assert "follow the guidelines" in hindi

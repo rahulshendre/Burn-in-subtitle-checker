@@ -34,6 +34,9 @@ MAX_LINES = 2
 # per-line cap. Checked against the whole caption because a burned-in caption's
 # wrap point cannot be recovered reliably from pixels.
 MAX_CHARS_ON_SCREEN = MAX_CHARS_PER_LINE * MAX_LINES
+# Languages PlanetRead has published guidelines for. Any other language is graded
+# against the Hindi caps as a reference only, and the report says so.
+GUIDELINE_LANGS = frozenset({"hi"})
 
 
 @dataclass
@@ -77,6 +80,12 @@ class VideoCompliance:
     lines_pass: int
     lines_measured: int
     violations: list[LineCompliance] = field(default_factory=list)
+    lang: str = "hi"
+
+    @property
+    def reference_only(self) -> bool:
+        """True when the language has no published guidelines of its own."""
+        return self.lang not in GUIDELINE_LANGS
 
     @property
     def share(self) -> float:
@@ -104,7 +113,7 @@ def line_compliance(event: SubtitleEvent) -> LineCompliance:
     )
 
 
-def check_compliance(events: list[SubtitleEvent]) -> VideoCompliance | None:
+def check_compliance(events: list[SubtitleEvent], lang: str = "hi") -> VideoCompliance | None:
     """Grade a video's readable subtitles against the checkable guidelines.
 
     Only lines OCR could read are graded - a band with no readable caption has no
@@ -121,4 +130,5 @@ def check_compliance(events: list[SubtitleEvent]) -> VideoCompliance | None:
         lines_pass=sum(1 for line in lines if line.lines_ok is True),
         lines_measured=sum(1 for line in lines if line.lines_ok is not None),
         violations=[line for line in lines if not line.compliant],
+        lang=lang,
     )

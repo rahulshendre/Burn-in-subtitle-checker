@@ -479,6 +479,9 @@ def _recommendations_section(advice: list | None) -> str:
     )
 
 
+_LANG_NAMES = {"mr": "Marathi", "kn": "Kannada"}
+
+
 def _compliance_banner(comp: VideoCompliance | None) -> str:
     """How many subtitle lines follow the checkable guideline caps."""
     if comp is None or comp.graded == 0:
@@ -491,6 +494,12 @@ def _compliance_banner(comp: VideoCompliance | None) -> str:
 
     pct = comp.share * 100
     color = _legibility_color(pct)
+    reference = (
+        f'<p class="note">PlanetRead has no published {_LANG_NAMES.get(comp.lang, comp.lang)} '
+        "guidelines yet, so this uses the Hindi character cap as a reference only.</p>"
+        if comp.reference_only
+        else ""
+    )
     rules = (
         f"<li>Up to {MAX_CHARS_ON_SCREEN} characters on screen "
         f"({MAX_LINES} lines &times; {MAX_CHARS_PER_LINE}): "
@@ -502,11 +511,12 @@ def _compliance_banner(comp: VideoCompliance | None) -> str:
         f'<span class="leg-score" style="color:{color}">{pct:.0f}<small>%</small></span>'
         '<div class="leg-caption">'
         f'<p class="leg-headline">{comp.compliant} of {comp.graded} '
-        "lines follow the guidelines</p>"
+        f"lines {'fit the Hindi caps (reference)' if comp.reference_only else 'follow the guidelines'}</p>"
         '<p class="note">Checked against the guideline rule a burned-in frame '
         "shows reliably: characters on screen (up to two lines at the per-line "
         "cap). Font, point size and spacing are set when the subtitles are "
         "authored and cannot be read back from the finished video.</p></div></div>"
+        f"{reference}"
         f'<ul class="compliance-rules">{rules}</ul>'
         f"{_compliance_violations(comp)}"
         "</section>"

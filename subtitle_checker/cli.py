@@ -111,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="A check_results.json file, or the out/<stem>/ directory holding it",
     )
     rep.add_argument("--video", required=True, help="Source video for frame + audio snippets")
+    rep.add_argument(
+        "--lang", default="hi", choices=SUPPORTED_LANGS,
+        help="Language of the video, so the compliance note matches (hi, kn, mr)",
+    )
     rep.add_argument("--out", help="Output HTML path (default: beside the results)")
 
     ev = subparsers.add_parser(
@@ -290,7 +294,7 @@ def _run_check(args: argparse.Namespace) -> int:
         print(f"  {event.start:7.2f}-{event.end:7.2f}  [{event.confidence:.2f}]  {text}")
 
     _print_legibility(events)
-    _print_compliance(events)
+    _print_compliance(events, args.lang)
     _run_audio_checks(
         video, events, out_dir, args.lang, args.asr,
         run_align=not getattr(args, "no_align", False),
@@ -428,16 +432,18 @@ def _print_recommendations(events: list) -> None:
             print(f"      - {tip}")
 
 
-def _print_compliance(events: list):
+def _print_compliance(events: list, lang: str = "hi"):
     """Print how many subtitle lines follow the checkable guideline caps."""
     from subtitle_checker.subtitles.compliance import (
         MAX_CHARS_ON_SCREEN,
         check_compliance,
     )
 
-    comp = check_compliance(events)
+    comp = check_compliance(events, lang)
     if comp is None:
         return None
+    if comp.reference_only:
+        print(f"\nnote: no {lang} guidelines published yet - using the Hindi caps as a reference")
     print(
         f"\nguideline compliance: {comp.compliant}/{comp.graded} lines "
         f"({comp.share * 100:.0f}%)"
@@ -470,7 +476,7 @@ def _run_report(args: argparse.Namespace) -> int:
     out = Path(args.out) if args.out else results_path.parent / f"{video.stem}_report.html"
     skipped = _load_skipped(results_path, video, results)
     legibility = _load_legibility(results_path, video)
-    compliance = _load_compliance(results_path, video)
+    compliance = _load_compliance(results_path, video, args.lang)
     recommendations = _load_recommendations(results_path, video)
     write_report(
         video, results, out,
@@ -510,7 +516,7 @@ def _load_recommendations(results_path: Path, video: Path) -> list | None:
     return legibility_advice(load_artifact(events_path)[1])
 
 
-def _load_compliance(results_path: Path, video: Path) -> object | None:
+def _load_compliance(results_path: Path, video: Path, lang: str = "hi") -> object | None:
     """Grade guideline compliance from the sibling events artifact when it exists."""
     from subtitle_checker.artifacts import load_artifact
     from subtitle_checker.subtitles.compliance import check_compliance
@@ -518,7 +524,7 @@ def _load_compliance(results_path: Path, video: Path) -> object | None:
     events_path = _sibling_artifact(results_path, video, "subtitle_events")
     if not events_path.exists():
         return None
-    return check_compliance(load_artifact(events_path)[1])
+    return check_compliance(load_artifact(events_path)[1], lang)
 
 
 def _load_skipped(results_path: Path, video: Path, results: list) -> list | None:
@@ -588,7 +594,7 @@ def _run_audio_checks(
         video, results, out_dir,
         skipped=skipped_lines(events, results, regions),
         legibility=video_legibility(events),
-        compliance=check_compliance(events),
+        compliance=check_compliance(events, lang),
         recommendations=legibility_advice(events),
     )
 
