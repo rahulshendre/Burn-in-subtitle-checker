@@ -13,6 +13,9 @@ from pathlib import Path
 import numpy as np
 
 SAMPLE_RATE = 16_000
+# Generous: a feature-length file decodes in minutes. This only stops a stuck or
+# corrupt file from hanging a run forever.
+DECODE_TIMEOUT_S = 3600
 
 
 def extract_audio(video: Path, sample_rate: int = SAMPLE_RATE) -> np.ndarray:
@@ -33,7 +36,7 @@ def extract_audio(video: Path, sample_rate: int = SAMPLE_RATE) -> np.ndarray:
         "f32le",
         "-",
     ]
-    proc = subprocess.run(cmd, capture_output=True, check=True)
+    proc = subprocess.run(cmd, capture_output=True, check=True, timeout=DECODE_TIMEOUT_S)
     # frombuffer is a read-only view of the pipe bytes; copy so downstream
     # consumers (torch tensors, in-place ops) get a writable, owned array
     return np.frombuffer(proc.stdout, dtype=np.float32).copy()

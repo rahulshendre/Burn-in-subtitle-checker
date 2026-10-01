@@ -19,6 +19,9 @@ import numpy as np
 DEFAULT_BAND_TOP = 0.70
 DEFAULT_FPS = 4.0
 DEFAULT_OUT_WIDTH = 640
+# Hard stops so a stuck or corrupt file fails instead of hanging a run.
+PROBE_TIMEOUT_S = 60
+FRAME_TIMEOUT_S = 120
 
 
 @dataclass
@@ -47,6 +50,7 @@ def probe(video: Path) -> VideoInfo:
         encoding="utf-8",
         errors="replace",
         check=True,
+        timeout=PROBE_TIMEOUT_S,
     )
     data = json.loads(proc.stdout)
     stream = data["streams"][0]
@@ -133,7 +137,9 @@ def extract_band_frame(
         "gray",
         "-",
     ]
-    out = subprocess.run(cmd, capture_output=True, check=True).stdout
+    out = subprocess.run(
+        cmd, capture_output=True, check=True, timeout=FRAME_TIMEOUT_S
+    ).stdout
     if len(out) < crop_h * info.width:
         raise ValueError(f"no frame at {t:.3f}s in {video}")
     return np.frombuffer(out[: crop_h * info.width], dtype=np.uint8).reshape(crop_h, info.width)
