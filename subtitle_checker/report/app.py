@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote
 
+from subtitle_checker.report.keycheck import RUN_REJECTED, check_key, is_key_rejection
 from subtitle_checker.report.webui import _STYLE, discover_reports
 
 LANGUAGES = {"hi": "Hindi", "mr": "Marathi"}
@@ -213,7 +214,8 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
             job.state = "error"
             job.error = job.log[-1] if job.log else "the check did not produce a report"
     except Exception as exc:  # surface any pipeline failure on the page
-        job.state, job.error = "error", f"{type(exc).__name__}: {exc}"
+        job.state = "error"
+        job.error = RUN_REJECTED if is_key_rejection(exc) else f"{type(exc).__name__}: {exc}"
     finally:
         # The report embeds the frames and audio it needs; the uploaded copies
         # would only fill the disk.
@@ -260,18 +262,25 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
     else:
         history = '<p class="muted">No checks yet. Your finished reports will appear here.</p>'
 
+    # Always in the page, so the key can be replaced later; hidden once one is saved.
     key_card = (
-        '<section class="card" id="keycard">'
+        f'<section class="card" id="keycard"{" hidden" if has_key else ""}>'
         "<h2>Sarvam API key</h2>"
-        '<p class="muted">Needed once. It is saved on this computer only.</p>'
+        '<p class="muted">'
+        + ("Paste a new key to replace the saved one." if has_key
+           else "Needed once. It is saved on this computer only.")
+        + "</p>"
         '<div class="row"><input id="key" type="password" placeholder="Paste the key">'
-        '<button id="savekey">Save</button></div></section>'
+        '<button id="savekey">Save</button></div>'
+        '<p id="keymsg" class="keymsg" role="alert"></p></section>'
     )
+    change_key = '<button id="changekey" class="quit">Change API key</button>' if has_key else ""
     body = (
         f'<div class="bar"><div class="brand">{html.escape(title)}</div>'
-        '<button id="quit" class="quit">Quit app</button></div>'
+        f'<div class="barbtns">{change_key}<button id="quit" class="quit">Quit app</button></div>'
+        "</div>"
         '<main class="wrap">'
-        + ("" if has_key else key_card)
+        + key_card
         + '<section class="card"><h2>New check</h2>'
         '<label class="lbl" for="video">Video</label>'
         '<input id="video" type="file" accept="video/*">'
@@ -325,6 +334,8 @@ _APP_STYLE = """<style>
   .runs a { color:#1f6f43; font-weight:600; } .runs a.sub { font-weight:400; font-size:.85rem; }
   .when { float:right; color:#889; font-size:.8rem; }
   .quit { background:transparent; border:1px solid rgba(255,255,255,.6); font-weight:400; }
+  .barbtns { display:flex; gap:.6rem; }
+  .keymsg { margin:.5rem 0 0; font-size:.85rem; color:#8a1f1f; min-height:1.1rem; }
 </style>"""
 
 _SCRIPT = """
@@ -344,9 +355,18 @@ function bar(pct,step,note,log){box.hidden=false;box.className='status';
     +(log?'<details><summary>Details</summary><pre>'+esc(log)+'</pre></details>':'');}
 function fail(msg,log){box.hidden=false;box.className='status error';
   box.innerHTML=esc(msg)+(log?'<pre>'+esc(log)+'</pre>':'');$('run').disabled=false;}
-if($('savekey')){$('savekey').onclick=function(){
-  var k=$('key').value.trim(); if(!k){return;}
-  fetch('/key',{method:'POST',body:k}).then(function(){location.reload();});};}
+function saveKey(){
+  var k=$('key').value.trim(); if(!k){$('keymsg').textContent='Paste the key first.';return;}
+  $('savekey').disabled=true; $('keymsg').style.color='#667'; $('keymsg').textContent='Checking the key...';
+  fetch('/key',{method:'POST',body:k}).then(function(r){return r.text().then(function(t){
+    if(r.ok){location.reload();return;}
+    $('keymsg').style.color=''; $('keymsg').textContent=t; $('savekey').disabled=false;});})
+  .catch(function(){$('keymsg').style.color=''; $('savekey').disabled=false;
+    $('keymsg').textContent='Could not reach the app. Is it still running?';});}
+$('savekey').onclick=saveKey;
+$('key').onkeydown=function(e){if(e.key==='Enter'){saveKey();}};
+if($('changekey')){$('changekey').onclick=function(){$('keycard').hidden=false;$('key').focus();
+  $('keycard').scrollIntoView();};}
 function upload(file,onpct){return new Promise(function(ok,no){
   var x=new XMLHttpRequest(); x.open('POST','/upload?name='+encodeURIComponent(file.name));
   x.upload.onprogress=function(e){if(e.lengthComputable){onpct(e.loaded/e.total);}};
@@ -421,9 +441,12 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
                 self._send(200, name.encode("utf-8"), "text/plain")
             elif self.path == "/key":
                 key = self.rfile.read(length).decode("utf-8").strip()
-                if key:
+                problem = check_key(key) if key else "Paste the key first."
+                if problem:
+                    self._send(400, problem.encode("utf-8"), "text/plain")
+                else:
                     save_key(home, key)
-                self._send(200, b"ok", "text/plain")
+                    self._send(200, b"ok", "text/plain")
             elif self.path == "/quit":
                 self._send(200, b"bye", "text/plain")
                 threading.Thread(target=self.server.shutdown, daemon=True).start()

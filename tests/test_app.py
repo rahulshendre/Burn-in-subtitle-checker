@@ -71,14 +71,85 @@ def test_past_runs_lists_reports_with_mistakes_pages(tmp_path):
 
 def test_render_app_asks_for_key_until_one_is_saved():
     no_key = render_app([], has_key=False)
-    assert 'id="keycard"' in no_key
+    assert 'id="keycard">' in no_key  # shown, not hidden
+    assert 'id="changekey"' not in no_key
     assert 'id="run" disabled' in no_key
     assert "No checks yet" in no_key
 
     with_key = render_app([], has_key=True)
-    assert 'id="keycard"' not in with_key
+    assert 'id="keycard" hidden' in with_key
     assert 'id="run">' in with_key
     assert "Marathi" in with_key
+
+
+def test_a_saved_key_can_always_be_changed_from_the_page():
+    page = render_app([], has_key=True)
+    assert ">Change API key<" in page
+    assert 'id="keymsg"' in page  # where a rejected key is explained
+
+
+def _serve(tmp_path):
+    import threading
+
+    server = app._Server(("127.0.0.1", 0), app._make_handler(tmp_path, Job(), threading.Lock()))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def _post_key(server, key):
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{server.server_address[1]}/key", data=key.encode(), method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return resp.status, resp.read().decode()
+    except urllib.error.HTTPError as err:
+        return err.code, err.read().decode()
+
+
+def test_a_key_sarvam_rejects_is_not_saved(tmp_path, monkeypatch):
+    monkeypatch.delenv(app.KEY_ENV, raising=False)
+    monkeypatch.setattr(app, "check_key", lambda key: "Sarvam did not accept this key.")
+    server = _serve(tmp_path)
+    try:
+        status, body = _post_key(server, "typo")
+    finally:
+        server.shutdown()
+    assert status == 400
+    assert body == "Sarvam did not accept this key."
+    assert not (tmp_path / "config.json").exists()
+    assert app.KEY_ENV not in os.environ
+
+
+def test_a_key_sarvam_accepts_is_saved(tmp_path, monkeypatch):
+    monkeypatch.delenv(app.KEY_ENV, raising=False)
+    monkeypatch.setattr(app, "check_key", lambda key: None)
+    server = _serve(tmp_path)
+    try:
+        status, _ = _post_key(server, "  good-key  ")
+    finally:
+        server.shutdown()
+    assert status == 200
+    assert os.environ[app.KEY_ENV] == "good-key"
+    assert (tmp_path / "config.json").exists()
+    monkeypatch.delenv(app.KEY_ENV)
+
+
+def test_an_empty_key_is_refused_without_calling_sarvam(tmp_path, monkeypatch):
+    def never(key):
+        raise AssertionError("must not call Sarvam for an empty key")
+
+    monkeypatch.setattr(app, "check_key", never)
+    server = _serve(tmp_path)
+    try:
+        status, body = _post_key(server, "   ")
+    finally:
+        server.shutdown()
+    assert status == 400
+    assert "Paste the key" in body
 
 
 def test_render_app_lists_past_runs():
@@ -129,6 +200,27 @@ def test_run_check_reports_a_pipeline_failure(tmp_path, monkeypatch):
 
     assert job.state == "error"
     assert "401" in job.error
+
+
+def test_run_check_tells_the_user_when_sarvam_rejects_the_key(tmp_path, monkeypatch):
+    from subtitle_checker import cli
+    from subtitle_checker.report.keycheck import RUN_REJECTED
+
+    video = tmp_path / "Clip.mp4"
+    video.write_bytes(b"v")
+
+    class Rejected(Exception):
+        status_code = 403  # what the Sarvam SDK raises for a bad key
+
+    def boom(args):
+        raise Rejected("headers: {}, status_code: 403, body: invalid_api_key_error")
+
+    monkeypatch.setattr(cli, "_run_check", boom)
+    job = Job(state="running")
+    app.run_check(job, tmp_path, video, None, "hi")
+
+    assert job.state == "error"
+    assert job.error == RUN_REJECTED
 
 
 def test_progress_fills_within_a_step_but_never_past_it():
