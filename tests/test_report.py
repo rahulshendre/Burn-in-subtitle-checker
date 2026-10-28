@@ -87,15 +87,12 @@ def test_source_label_defaults_to_ocr():
     assert "Subtitle in the file" not in out
 
 
-def test_source_label_srt_relabels_written_and_score():
+def test_source_label_srt_relabels_the_subtitle_column():
     out = render_report(
         _sample(), FakeEvidence(), title="Demo", source_label="SRT"
     )
     assert "Subtitle in the file" in out
     assert "Subtitle on screen" not in out
-    # the score breakdown names the source too, not "OCR"
-    assert "SRT 60%" in out
-    assert "OCR 60%" not in out
 
 
 def test_flags_render_worst_first_ok_excluded_from_cards():
@@ -113,19 +110,18 @@ def test_ok_rows_go_to_ledger_table():
     assert "कैसे मिला पायेंगे" in out
 
 
-def test_combined_score_shown_on_card():
+def test_one_confidence_number_shown_on_card():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    # the fused score headlines the card, with the OCR + ASR breakdown beside it
-    assert "score 39" in out
-    assert "OCR 80%" in out and "ASR 21%" in out
+    # the fused number is the only figure on the card; its inputs are not repeated
+    assert "Confidence 39%" in out
+    assert "OCR 80%" not in out and "ASR 21%" not in out
 
 
-def test_ledger_has_score_column():
+def test_ledger_has_confidence_column():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "<th>Score</th>" in out
-    assert ">84<" in out  # the OK line's combined score, rounded for the cell
-    # both confidences show inline in the cell, not just on hover
-    assert "OCR 60%" in out and "ASR 95%" in out
+    assert "<th>Confidence</th>" in out
+    assert ">84%<" in out  # the OK line's combined number, rounded for the cell
+    assert "OCR 60%" not in out and "ASR 95%" not in out
 
 
 def test_missing_subtitle_placeholder_when_no_text():
@@ -277,11 +273,12 @@ def test_accuracy_stats_empty():
 
 def test_accuracy_bar_appears_in_report():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "lines checked" in out
-    assert "matched" in out
+    assert "3 lines" in out
+    assert "1 matched" in out
+    assert "2 flagged" in out
     assert "match rate" in out
 
 
 def test_accuracy_bar_absent_for_empty_results():
     out = render_report([], FakeEvidence(), title="Empty")
-    assert "lines checked" not in out
+    assert '<div class="acc-bar">' not in out

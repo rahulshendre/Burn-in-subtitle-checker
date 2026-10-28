@@ -148,37 +148,44 @@ def accuracy_stats(results: list[CheckResult]) -> dict:
         "matched": matched,
         "flagged": flagged,
         "uncheckable": uncheckable,
+        "checkable": checkable,
         "match_rate": rate,
     }
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'s' if n != 1 else ''}"
+
+
 def _accuracy_bar(results: list[CheckResult]) -> str:
-    """A stat bar: lines checked, matched, flagged, match rate %."""
+    """A stat bar: lines, matched, flagged, could not be checked, match rate %.
+
+    Matched + flagged + could-not-be-checked always add up to the line count.
+    The match rate leaves out the lines that could not be checked (they were not
+    verified, so they must not dilute it) and says so.
+    """
     if not results:
         return ""
     s = accuracy_stats(results)
-    rate_html = (
-        f'<span class="acc-rate" style="color:{_rate_color(s["match_rate"])}">'
-        f'{s["match_rate"]:.0f}% match rate</span>'
-        if s["match_rate"] is not None
-        else ""
-    )
-    unc = (
-        f'<span class="acc-item">{s["uncheckable"]} could not be checked</span>'
-        if s["uncheckable"]
-        else ""
-    )
-    return (
-        f'<div class="acc-bar">'
-        f'<span class="acc-item">{s["total"]} lines checked</span>'
-        f'<span class="acc-sep">&middot;</span>'
-        f'<span class="acc-item">{s["matched"]} matched</span>'
-        f'<span class="acc-sep">&middot;</span>'
-        f'<span class="acc-item">{s["flagged"]} flagged</span>'
-        + (f'<span class="acc-sep">&middot;</span>{unc}' if unc else "")
-        + (f'<span class="acc-sep">&middot;</span>{rate_html}' if rate_html else "")
-        + "</div>"
-    )
+    parts = [
+        _plural(s["total"], "line"),
+        f'{s["matched"]} matched',
+        f'{s["flagged"]} flagged',
+    ]
+    if s["uncheckable"]:
+        parts.append(f'{s["uncheckable"]} could not be checked')
+    items = [f'<span class="acc-item">{p}</span>' for p in parts]
+    if s["match_rate"] is not None:
+        basis = (
+            f' (of the {_plural(s["checkable"], "line")} that could be checked)'
+            if s["uncheckable"] else ""
+        )
+        items.append(
+            f'<span class="acc-rate" style="color:{_rate_color(s["match_rate"])}">'
+            f'{s["match_rate"]:.0f}% match rate{basis}</span>'
+        )
+    sep = '<span class="acc-sep">&middot;</span>'
+    return f'<div class="acc-bar">{sep.join(items)}</div>'
 
 
 def _rate_color(rate: float | None) -> str:
@@ -191,11 +198,22 @@ def _rate_color(rate: float | None) -> str:
     return "#c0392b"
 
 
+CONFIDENCE_EXPLAINED = (
+    "Confidence is how sure the tool is that a subtitle is correct, "
+    "from 0 to 100% (higher is better)."
+)
+
+
+def _unchecked_suffix(n: int) -> str:
+    """Tail for a headline: lines that could not be checked are not flags or mistakes."""
+    return f" (and {_plural(n, 'line')} that could not be checked)" if n else ""
+
+
 def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
     counts = {v: 0 for v in _VERDICT_ORDER}
     for r in results:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
-    n_flags = sum(c for v, c in counts.items() if v is not Verdict.OK)
+    n_flags = sum(c for v, c in counts.items() if v not in (Verdict.OK, Verdict.UNCHECKABLE))
     chips = "".join(
         f'<span class="chip" style="background:{_VERDICT_COLOR[v]}">'
         f"{_VERDICT_LABEL[v]} {counts[v]}</span>"
@@ -206,7 +224,7 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         f"{n_flags} flag(s) for review"
         if n_flags
         else "No flags - every checked line matches the audio"
-    )
+    ) + _unchecked_suffix(counts.get(Verdict.UNCHECKABLE, 0))
     return (
         f'<header><h1>{html.escape(title)}</h1>'
         f'<p class="sub">Burn-in subtitle checker · {html.escape(stamp)}</p>'
@@ -215,7 +233,8 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         f'<div class="chips">{chips}</div>'
         "<p class=\"note\">Each card shows the video frame, the subtitle beside "
         "what the audio says, and a short audio clip to check. Small single-word errors "
-        "are not flagged automatically - scan the two columns below to catch them.</p>"
+        "are not flagged automatically - scan the two columns below to catch them. "
+        f"{CONFIDENCE_EXPLAINED}</p>"
         "</header>"
     )
 
@@ -233,12 +252,8 @@ def _suggestion_html(r: CheckResult) -> str:
     from subtitle_checker.report.suggest import suggest_correction
     s = suggest_correction(r)
     if s.confident:
-        conf_html = (
-            f' <span class="suggest-conf">(match score: {s.asr_confidence:.0%})</span>'
-            if s.asr_confidence is not None else ""
-        )
         return (
-            f'<div class="suggest"><h4>{html.escape(s.heading)}{conf_html}</h4>'
+            f'<div class="suggest"><h4>{html.escape(s.heading)}</h4>'
             f'<p class="deva suggest-text">{html.escape(s.text)}</p>'
             f'<p class="suggest-note">{html.escape(s.note)}</p></div>'
         )
@@ -251,7 +266,7 @@ def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
     )
-    score = _score_html(r, source_label)
+    score = _score_html(r)
     written, heard = _written_heard(
         r, no_subtitle='<em class="none">- no subtitle -</em>',
         not_heard='<em class="none">- nothing heard -</em>',
@@ -274,32 +289,23 @@ def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     )
 
 
-def _score_breakdown(r: CheckResult, source_label: str = "OCR") -> list[str]:
-    """The source-read and ASR confidences that fold into the combined score."""
-    bits = []
-    if r.ocr_confidence is not None:
-        bits.append(f"{source_label} {r.ocr_confidence:.0%}")
-    if r.score is not None:
-        bits.append(f"ASR {r.score:.0%}")
-    return bits
+_CONFIDENCE_HINT = (
+    "How sure the tool is that this subtitle is correct, from 0 to 100% (higher is better)"
+)
 
 
-def _score_html(r: CheckResult, source_label: str = "OCR") -> str:
-    """Card-head score: the one combined confidence with its source + ASR parts."""
+def _score_html(r: CheckResult) -> str:
+    """Card-head confidence: the one blended 0-100 number, or nothing when there is none."""
     if r.combined_score is None:
         return ""
-    bits = _score_breakdown(r, source_label)
-    detail = f' <small>{" &middot; ".join(bits)}</small>' if bits else ""
-    return f'<span class="score">score {r.combined_score:.0f}{detail}</span>'
+    return f'<span class="score" title="{_CONFIDENCE_HINT}">Confidence {r.combined_score:.0f}%</span>'
 
 
-def _score_cell(r: CheckResult, source_label: str = "OCR") -> str:
-    """Ledger score column: the combined number over its source + ASR parts."""
+def _score_cell(r: CheckResult) -> str:
+    """Ledger confidence column: the same one number."""
     if r.combined_score is None:
         return '<td class="score-cell">-</td>'
-    bits = _score_breakdown(r, source_label)
-    detail = f'<br><small>{html.escape(" · ".join(bits))}</small>' if bits else ""
-    return f'<td class="score-cell">{r.combined_score:.0f}{detail}</td>'
+    return f'<td class="score-cell">{r.combined_score:.0f}%</td>'
 
 
 def _ledger_section(
@@ -307,18 +313,18 @@ def _ledger_section(
 ) -> str:
     if not oks:
         return ""
-    rows = "\n".join(_ledger_row(r, evidence, source_label) for r in oks)
+    rows = "\n".join(_ledger_row(r, evidence) for r in oks)
     return (
         '<section class="ledger"><h2>Lines that match the audio</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
         f'<table><thead><tr><th>Time</th><th>Frame</th><th>{_subtitle_heading(source_label)}</th>'
-        "<th>What the audio says</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
+        "<th>What the audio says</th><th>Confidence</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
 
 
-def _ledger_row(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
+def _ledger_row(r: CheckResult, evidence: Evidence) -> str:
     thumb = _thumb_html(evidence.frame_png((r.start + r.end) / 2.0))
     audio = _audio_html(
         evidence.audio_clip(max(0.0, r.start - _AUDIO_PAD_S), r.end + _AUDIO_PAD_S)
@@ -327,7 +333,7 @@ def _ledger_row(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -
     return (
         f'<tr><td class="tspan">{_ts(r.start)}</td><td class="thumb">{thumb}</td>'
         f'<td class="deva">{written}</td><td class="deva">{heard}</td>'
-        f"{_score_cell(r, source_label)}<td>{audio}</td></tr>"
+        f"{_score_cell(r)}<td>{audio}</td></tr>"
     )
 
 
@@ -700,9 +706,7 @@ _STYLE = """<style>
            font-weight:600; }
   .tspan { font-variant-numeric:tabular-nums; color:#555; font-size:.9rem; }
   .score { margin-left:auto; color:#333; font-size:.9rem; font-weight:600; }
-  .score small { color:#888; font-weight:normal; font-size:.8rem; }
   .score-cell { text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
-  .score-cell small { color:#888; font-weight:normal; font-size:.72rem; }
   .leg-grade { display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap;
                background:#fafafa; border:1px solid var(--line); border-radius:6px;
                padding:1rem 1.2rem; }
@@ -751,8 +755,6 @@ _STYLE = """<style>
   .suggest-none { margin:.7rem 0 .5rem; padding:.55rem .8rem; background:#f6f6f6;
                   border:1px solid #e4e4e4; border-radius:5px; color:#777;
                   font-size:.88rem; }
-  .suggest-conf { font-weight:normal; font-size:.8rem; color:#555;
-                  text-transform:none; letter-spacing:0; }
   .acc-bar { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .6rem;
              margin:.5rem 0 .8rem; padding:.55rem .8rem; background:#f5f9f6;
              border:1px solid #cfe8d8; border-radius:6px; font-size:.92rem; }

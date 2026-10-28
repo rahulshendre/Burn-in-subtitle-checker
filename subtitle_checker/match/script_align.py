@@ -148,10 +148,10 @@ def align_script(
 
         if ratio >= min_ratio:
             verdict = Verdict.OK
-            reason = f"The audio matches the subtitle file (match {ratio:.0f}%)"
+            reason = "The audio matches the subtitle file"
         else:
             verdict = Verdict.TEXT_MISMATCH
-            reason = f"The audio doesn't match the subtitle file (match {ratio:.0f}%)"
+            reason = "The audio doesn't match the subtitle file"
 
         results.append(
             CheckResult(

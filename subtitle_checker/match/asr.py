@@ -204,7 +204,7 @@ def transcribe_lines(
         match = ratio / 100.0
         if ratio >= min_ratio:
             verdict = Verdict.OK
-            reason = f"The audio matches the subtitle (match {ratio:.0f}%)"
+            reason = "The audio matches the subtitle"
         elif event.end - event.start < min_span:
             # The words diverge, but the caption is too short for the ASR to
             # transcribe reliably - not enough audio to accuse a subtitle. So
@@ -212,10 +212,10 @@ def transcribe_lines(
             # (the words differ). It is unverifiable: surfaced for a human to
             # listen, kept out of the "matching" list and the accuracy rate.
             verdict = Verdict.UNCHECKABLE
-            reason = f"Too short to check (match {ratio:.0f}%)"
+            reason = "Too short to check"
         else:
             verdict = Verdict.TEXT_MISMATCH
-            reason = f"The audio doesn't match the subtitle (match {ratio:.0f}%)"
+            reason = "The audio doesn't match the subtitle"
         results.append(
             CheckResult(
                 start=event.start,

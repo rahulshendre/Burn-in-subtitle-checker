@@ -167,10 +167,10 @@ def test_srt_source_label():
 
 def test_accuracy_bar_in_mistakes_page():
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo")
-    assert "lines checked" in out
+    assert "3 lines" in out
     assert "match rate" in out
 
 
 def test_accuracy_bar_absent_for_empty_results():
     out = render_mistakes([], FakeEvidence(), title="Empty")
-    assert "lines checked" not in out
+    assert '<div class="acc-bar">' not in out

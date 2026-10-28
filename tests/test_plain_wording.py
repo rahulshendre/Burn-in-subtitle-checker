@@ -32,8 +32,9 @@ class _Evidence:
 
 def _every_verdict() -> list[CheckResult]:
     return [
-        CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "The audio doesn't match the subtitle (match 43%)",
-                    subtitle_text="हमारे गाँव में", heard_text="हमारे शहर में"),
+        CheckResult(1.0, 3.0, Verdict.TEXT_MISMATCH, "The audio doesn't match the subtitle",
+                    subtitle_text="हमारे गाँव में", heard_text="हमारे शहर में बिजली की कमी नहीं है",
+                    score=0.43, ocr_confidence=0.9, combined_score=57.0),
         CheckResult(4.0, 6.0, Verdict.MISSING_SUBTITLE, "Someone is speaking but there is no subtitle",
                     heard_text="आप सब का धन्यवाद"),
         CheckResult(7.0, 9.0, Verdict.ORPHAN_SUBTITLE, "There is a subtitle here but no speech",
@@ -42,8 +43,9 @@ def _every_verdict() -> list[CheckResult]:
                     subtitle_text="ठीक है"),
         CheckResult(13.0, 15.0, Verdict.UNCHECKABLE, "Music is playing, so the speech couldn't be checked",
                     subtitle_text="गाना बज रहा है"),
-        CheckResult(16.0, 18.0, Verdict.OK, "The audio matches the subtitle (match 95%)",
-                    subtitle_text="कैसे मिला पायेंगे", heard_text="कैसे मिला पायेंगे"),
+        CheckResult(16.0, 18.0, Verdict.OK, "The audio matches the subtitle",
+                    subtitle_text="कैसे मिला पायेंगे", heard_text="कैसे मिला पायेंगे",
+                    score=0.95, ocr_confidence=0.6, combined_score=84.5),
     ]
 
 
@@ -102,4 +104,5 @@ def test_reason_strings_in_the_checks_are_plain():
             found.append((path.name, reason))
             hits = [word for word in banned if word in reason.lower()]
             assert not hits, f"{path.name}: {reason!r} uses {hits}"
+            assert "%" not in reason, f"{path.name}: {reason!r} repeats the match figure"
     assert len(found) >= 10, "the scan should see the checks' reason strings"

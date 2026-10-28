@@ -30,14 +30,17 @@ from subtitle_checker.report.html import (
     _VERDICT_LABEL,
     _VERDICT_ORDER,
     Evidence,
+    CONFIDENCE_EXPLAINED,
     _accuracy_bar,
     _audio_html,
     _frame_html,
+    _score_html,
     _subtitle_heading,
+    _suggestion_html,
     _ts,
+    _unchecked_suffix,
     _written_heard,
 )
-from subtitle_checker.report.suggest import suggest_correction
 
 
 def render_mistakes(
@@ -71,12 +74,13 @@ def render_mistakes(
 
 
 def _header(title: str, results: list[CheckResult], flags: list[CheckResult], stamp: str) -> str:
-    n = len(flags)
+    n = sum(1 for r in flags if r.verdict is not Verdict.UNCHECKABLE)
+    unchecked = len(flags) - n
     headline = (
         f"{n} subtitle mistake{'s' if n != 1 else ''} to review"
         if n
         else "No mistakes found - every checked line matches the audio"
-    )
+    ) + _unchecked_suffix(unchecked)
     return (
         f"<header><h1>{html.escape(title)}</h1>"
         f'<p class="sub">Subtitle mistakes to fix &middot; {html.escape(stamp)}</p>'
@@ -84,7 +88,8 @@ def _header(title: str, results: list[CheckResult], flags: list[CheckResult], st
         f'<p class="headline">{headline}</p>'
         f"{_summary_chips(flags)}"
         '<p class="note">Only the lines that need fixing are listed. For each one: '
-        "the subtitle as written, what the audio says, and the suggested correction.</p>"
+        "the subtitle as written, what the audio says, and the suggested correction. "
+        f"{CONFIDENCE_EXPLAINED}</p>"
         "</header>"
     )
 
@@ -133,7 +138,7 @@ def _mistake_card(r: CheckResult, evidence: Evidence, source_label: str) -> str:
         f'<article class="card" style="border-left:6px solid {color}">'
         '<div class="card-head">'
         f'<span class="badge" style="background:{color}">{_VERDICT_LABEL[r.verdict]}</span>'
-        f'<span class="tspan">{_ts(r.start)} - {_ts(r.end)}</span></div>'
+        f'<span class="tspan">{_ts(r.start)} - {_ts(r.end)}</span>{_score_html(r)}</div>'
         '<div class="card-body">'
         f'<div class="frame">{frame}</div>'
         '<div class="detail">'
@@ -144,26 +149,6 @@ def _mistake_card(r: CheckResult, evidence: Evidence, source_label: str) -> str:
         f"{_suggestion_html(r)}{audio}"
         "</div></div></article>"
     )
-
-
-def _suggestion_html(r: CheckResult) -> str:
-    """The suggested text for a mistake, or an honest "could not tell".
-
-    A corrected line and a filled-in missing line use different headings (see
-    report.suggest), so the editor is not told a best-guess is a confirmed fix.
-    """
-    s = suggest_correction(r)
-    if s.confident:
-        conf_html = (
-            f' <span class="suggest-conf">(match score: {s.asr_confidence:.0%})</span>'
-            if s.asr_confidence is not None else ""
-        )
-        return (
-            f'<div class="suggest"><h4>{html.escape(s.heading)}{conf_html}</h4>'
-            f'<p class="deva suggest-text">{html.escape(s.text)}</p>'
-            f'<p class="suggest-note">{html.escape(s.note)}</p></div>'
-        )
-    return f'<p class="suggest-none">{html.escape(s.note)}</p>'
 
 
 def _head(title: str) -> str:
