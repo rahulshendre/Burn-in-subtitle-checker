@@ -33,6 +33,7 @@ from subtitle_checker.report.html import (
     _accuracy_bar,
     _audio_html,
     _frame_html,
+    _subtitle_heading,
     _ts,
     _written_heard,
 )
@@ -126,7 +127,7 @@ def _mistake_card(r: CheckResult, evidence: Evidence, source_label: str) -> str:
     written, heard = _written_heard(
         r,
         no_subtitle='<em class="none">- no subtitle -</em>',
-        not_heard='<em class="none">- not transcribed -</em>',
+        not_heard='<em class="none">- nothing heard -</em>',
     )
     return (
         f'<article class="card" style="border-left:6px solid {color}">'
@@ -137,8 +138,8 @@ def _mistake_card(r: CheckResult, evidence: Evidence, source_label: str) -> str:
         f'<div class="frame">{frame}</div>'
         '<div class="detail">'
         '<div class="texts">'
-        f'<div class="col"><h4>Written ({source_label})</h4><p class="deva">{written}</p></div>'
-        f'<div class="col"><h4>Heard (ASR)</h4><p class="deva">{heard}</p></div>'
+        f'<div class="col"><h4>{_subtitle_heading(source_label)}</h4><p class="deva">{written}</p></div>'
+        f'<div class="col"><h4>What the audio says</h4><p class="deva">{heard}</p></div>'
         "</div>"
         f"{_suggestion_html(r)}{audio}"
         "</div></div></article>"

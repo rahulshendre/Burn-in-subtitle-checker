@@ -127,7 +127,7 @@ def check_structural(
                     start=event.start,
                     end=event.end,
                     verdict=Verdict.UNCHECKABLE,
-                    reason="subtitle over music - speech not verifiable without separation",
+                    reason="Music is playing, so the speech couldn't be checked",
                     subtitle_text=event.text,
                 )
             )
@@ -137,7 +137,7 @@ def check_structural(
                     start=event.start,
                     end=event.end,
                     verdict=Verdict.ORPHAN_SUBTITLE,
-                    reason="subtitle present with no speech beneath it",
+                    reason="There is a subtitle here but no speech",
                     subtitle_text=event.text,
                 )
             )
@@ -156,7 +156,7 @@ def check_structural(
                         start=gap_start,
                         end=gap_end,
                         verdict=Verdict.MISSING_SUBTITLE,
-                        reason="speech present with no subtitle on screen",
+                        reason="Someone is speaking but there is no subtitle",
                     )
                 )
     results.extend(_merge_missing(missing, events))

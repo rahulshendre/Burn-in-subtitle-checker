@@ -139,7 +139,7 @@ def align_script(
                     start=event.start,
                     end=event.end,
                     verdict=Verdict.OK,
-                    reason="line too short to check word-for-word",
+                    reason="Too short to check",
                     subtitle_text=event.text,
                     heard_text=heard_text,
                 )
@@ -148,10 +148,10 @@ def align_script(
 
         if ratio >= min_ratio:
             verdict = Verdict.OK
-            reason = f"heard words match the SRT (match {ratio:.0f}%)"
+            reason = f"The audio matches the subtitle file (match {ratio:.0f}%)"
         else:
             verdict = Verdict.TEXT_MISMATCH
-            reason = f"heard words differ from the SRT (match {ratio:.0f}%)"
+            reason = f"The audio doesn't match the subtitle file (match {ratio:.0f}%)"
 
         results.append(
             CheckResult(

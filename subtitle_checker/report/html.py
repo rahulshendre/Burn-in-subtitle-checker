@@ -53,13 +53,18 @@ _VERDICT_ORDER = [
     Verdict.OK,
 ]
 _VERDICT_LABEL = {
-    Verdict.TEXT_MISMATCH: "Text mismatch",
-    Verdict.MISSING_SUBTITLE: "Missing subtitle",
-    Verdict.ORPHAN_SUBTITLE: "Orphan subtitle",
-    Verdict.TIMING_DRIFT: "Timing drift",
-    Verdict.UNCHECKABLE: "Uncheckable",
+    Verdict.TEXT_MISMATCH: "Subtitle doesn't match the audio",
+    Verdict.MISSING_SUBTITLE: "Speech with no subtitle",
+    Verdict.ORPHAN_SUBTITLE: "Subtitle with no speech",
+    Verdict.TIMING_DRIFT: "Subtitle timing is off",
+    Verdict.UNCHECKABLE: "Couldn't check",
     Verdict.OK: "OK",
 }
+def _subtitle_heading(source_label: str) -> str:
+    """Plain column heading for the subtitle text: read off the screen, or from the SRT."""
+    return "Subtitle on screen" if source_label == "OCR" else "Subtitle in the file"
+
+
 _VERDICT_COLOR = {
     Verdict.TEXT_MISMATCH: "#c0392b",
     Verdict.MISSING_SUBTITLE: "#d35400",
@@ -159,7 +164,7 @@ def _accuracy_bar(results: list[CheckResult]) -> str:
         else ""
     )
     unc = (
-        f'<span class="acc-item">{s["uncheckable"]} uncheckable</span>'
+        f'<span class="acc-item">{s["uncheckable"]} could not be checked</span>'
         if s["uncheckable"]
         else ""
     )
@@ -208,9 +213,9 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         f"{_accuracy_bar(results)}"
         f'<p class="headline">{headline}</p>'
         f'<div class="chips">{chips}</div>'
-        "<p class=\"note\">Each card shows the subtitle frame, the written text beside "
-        "what the ASR heard, and an audio snippet to verify. Subtle single-word errors "
-        "are not auto-flagged - scan the heard-vs-written column below to catch them.</p>"
+        "<p class=\"note\">Each card shows the video frame, the subtitle beside "
+        "what the audio says, and a short audio clip to check. Small single-word errors "
+        "are not flagged automatically - scan the two columns below to catch them.</p>"
         "</header>"
     )
 
@@ -249,7 +254,7 @@ def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
     score = _score_html(r, source_label)
     written, heard = _written_heard(
         r, no_subtitle='<em class="none">- no subtitle -</em>',
-        not_heard='<em class="none">- not transcribed -</em>',
+        not_heard='<em class="none">- nothing heard -</em>',
     )
     return (
         f'<article class="card" style="border-left:6px solid {color}">'
@@ -260,8 +265,8 @@ def _card(r: CheckResult, evidence: Evidence, source_label: str = "OCR") -> str:
         f'<div class="frame">{frame}</div>'
         f'<div class="detail">'
         f'<div class="texts">'
-        f'<div class="col"><h4>Written ({source_label})</h4><p class="deva">{written}</p></div>'
-        f'<div class="col"><h4>Heard (ASR)</h4><p class="deva">{heard}</p></div>'
+        f'<div class="col"><h4>{_subtitle_heading(source_label)}</h4><p class="deva">{written}</p></div>'
+        f'<div class="col"><h4>What the audio says</h4><p class="deva">{heard}</p></div>'
         f"</div>"
         f"{_suggestion_html(r)}"
         f'<p class="reason">{html.escape(r.reason)}</p>{audio}'
@@ -304,11 +309,11 @@ def _ledger_section(
         return ""
     rows = "\n".join(_ledger_row(r, evidence, source_label) for r in oks)
     return (
-        '<section class="ledger"><h2>Matching lines - heard vs written</h2>'
+        '<section class="ledger"><h2>Lines that match the audio</h2>'
         '<p class="note">These lines passed the automatic check. Skim the two columns '
         "for spelling or word swaps the tool cannot flag on its own.</p>"
-        f'<table><thead><tr><th>Time</th><th>Frame</th><th>Written ({source_label})</th>'
-        "<th>Heard (ASR)</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
+        f'<table><thead><tr><th>Time</th><th>Frame</th><th>{_subtitle_heading(source_label)}</th>'
+        "<th>What the audio says</th><th>Score</th><th>Audio</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
 
@@ -363,7 +368,7 @@ def _legibility_banner(leg: VideoLegibility | None) -> str:
         f'<p class="leg-headline">{_legibility_headline(leg.score)}</p>'
         f'<p class="note">How readable the subtitles are on screen across '
         f"{leg.line_count} line(s). Optical contrast between the text and its "
-        "background stands in for how easily a viewer - or an OCR engine - can "
+        "background stands in for how easily a viewer - or a computer - can "
         "make out each word.</p></div></div>"
         f"{_legibility_bands_html(leg)}"
         "</section>"
@@ -435,7 +440,7 @@ def _legibility_section(leg: VideoLegibility | None, evidence: Evidence) -> str:
         '<p class="note">The lowest-contrast subtitles in the video. A low score '
         "means the text and its background are close in brightness, so the words "
         "are hard to read.</p>"
-        "<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle (OCR read)</th>"
+        "<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle on screen</th>"
         "<th>Legibility</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )
@@ -473,7 +478,7 @@ def _recommendations_section(advice: list | None) -> str:
         f'<p class="note">{html.escape(advice_summary(advice) or "")} These are '
         "measured, fixable causes - contrast against the background and on-screen "
         "text size - for the lines that read below Clear.</p>"
-        "<table><thead><tr><th>Time</th><th>Subtitle (OCR read)</th>"
+        "<table><thead><tr><th>Time</th><th>Subtitle on screen</th>"
         "<th>Suggested fix</th></tr></thead><tbody>"
         f"{body}</tbody></table></section>"
     )
@@ -534,7 +539,7 @@ def _compliance_violations(comp: VideoCompliance) -> str:
         for v in sorted(comp.violations, key=lambda v: v.start)
     )
     return (
-        "<table><thead><tr><th>Time</th><th>Subtitle (OCR read)</th>"
+        "<table><thead><tr><th>Time</th><th>Subtitle on screen</th>"
         "<th>Breaks the guideline</th></tr></thead><tbody>"
         f"{rows}</tbody></table>"
     )
@@ -553,7 +558,7 @@ def _skipped_section(
         '<p class="note">These subtitles were detected but not verified '
         "word-for-word - checking them against the audio would risk a false "
         "alarm. Each row says why.</p>"
-        f'<table><thead><tr><th>Time</th><th>Frame</th><th>Subtitle ({source_label} read)</th>'
+        f'<table><thead><tr><th>Time</th><th>Frame</th><th>{_subtitle_heading(source_label)}</th>'
         "<th>Why skipped</th></tr></thead><tbody>"
         f"{rows}</tbody></table></section>"
     )

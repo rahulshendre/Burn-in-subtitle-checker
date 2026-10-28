@@ -83,16 +83,16 @@ def test_document_is_self_contained_html():
 
 def test_source_label_defaults_to_ocr():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "Written (OCR)" in out
-    assert "Written (SRT)" not in out
+    assert "Subtitle on screen" in out
+    assert "Subtitle in the file" not in out
 
 
 def test_source_label_srt_relabels_written_and_score():
     out = render_report(
         _sample(), FakeEvidence(), title="Demo", source_label="SRT"
     )
-    assert "Written (SRT)" in out
-    assert "Written (OCR)" not in out
+    assert "Subtitle in the file" in out
+    assert "Subtitle on screen" not in out
     # the score breakdown names the source too, not "OCR"
     assert "SRT 60%" in out
     assert "OCR 60%" not in out
@@ -103,12 +103,12 @@ def test_flags_render_worst_first_ok_excluded_from_cards():
     # two flags -> two cards; the OK row is not a card
     assert out.count('class="card"') == 2
     # text mismatch (worst) card comes before the missing-subtitle card
-    assert out.index("Text mismatch") < out.index("Missing subtitle")
+    assert out.index("Subtitle doesn't match the audio") < out.index("Speech with no subtitle")
 
 
 def test_ok_rows_go_to_ledger_table():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
-    assert "Matching lines" in out and "<table>" in out
+    assert "Lines that match the audio" in out and "<table>" in out
     # the OK line's text lands in the ledger, its Devanagari preserved verbatim
     assert "कैसे मिला पायेंगे" in out
 
@@ -150,13 +150,13 @@ def test_skipped_lines_render_with_reason():
     skipped = [
         (
             SubtitleEvent(12.0, 14.0, "और बुरा तो तब होगा", 0.32),
-            "OCR read too unreliable to compare (confidence 0.32)",
+            "The subtitle was too hard to read to compare it with the audio",
         )
     ]
     out = render_report(_sample(), FakeEvidence(), title="Demo", skipped=skipped)
     assert "Skipped lines (1)" in out
     assert "और बुरा तो तब होगा" in out
-    assert "confidence 0.32" in out
+    assert "too hard to read" in out
 
 
 def test_no_skipped_section_when_none_given():

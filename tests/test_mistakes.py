@@ -70,7 +70,7 @@ def test_only_flags_appear_ok_lines_excluded():
 def test_no_full_report_sections():
     # this page is errors only - none of the full report's context blocks
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo")
-    assert "Matching lines" not in out
+    assert "Lines that match the audio" not in out
     assert "Subtitle legibility" not in out
     assert "Guideline compliance" not in out
     assert "Skipped lines" not in out
@@ -86,7 +86,7 @@ def test_missing_without_transcript_shows_action_note():
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo")
     # the sample missing-subtitle flag has no heard line - tell the editor to add
     # a caption, not the wrong-text "could not determine the correct text"
-    assert "could not be transcribed" in out
+    assert "words could not be picked up" in out
     assert "add a caption" in out.lower()
     assert "Could not determine the correct text" not in out
 
@@ -103,7 +103,7 @@ def test_missing_with_transcript_shows_best_guess():
     out = render_mistakes(results, FakeEvidence(), title="Demo")
     assert "Audio says (best guess)" in out
     assert "यहाँ कुछ बोला गया था" in out
-    assert "confirm before use" in out
+    assert "listen and confirm before using it" in out
     assert "Suggested correction" not in out
     assert "Could not determine the correct text" not in out
 
@@ -129,8 +129,8 @@ def test_headline_counts_the_mistakes():
 def test_summary_groups_mistakes_by_kind():
     # the sample has one text mismatch and one missing subtitle - both counted
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo")
-    assert "Text mismatch 1" in out
-    assert "Missing subtitle 1" in out
+    assert "Subtitle doesn't match the audio 1" in out
+    assert "Speech with no subtitle 1" in out
     # OK is never a mistake kind, so it is not chipped
     assert "OK 1" not in out
 
@@ -161,8 +161,8 @@ def test_null_evidence_degrades():
 
 def test_srt_source_label():
     out = render_mistakes(_sample(), FakeEvidence(), title="Demo", source_label="SRT")
-    assert "Written (SRT)" in out
-    assert "Written (OCR)" not in out
+    assert "Subtitle in the file" in out
+    assert "Subtitle on screen" not in out
 
 
 def test_accuracy_bar_in_mistakes_page():

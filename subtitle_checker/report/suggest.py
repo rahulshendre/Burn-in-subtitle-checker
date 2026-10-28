@@ -60,12 +60,12 @@ _NO_SUGGESTION = "Could not determine the correct text - check the audio for thi
 # line has no wrong text to correct - the heard text is what *should be captioned*,
 # offered as an unverified best guess (ASR is the weak side, see the module note).
 _CORRECTION_NOTE = "Suggested from what the audio says here."
-_MISSING_NOTE = "Unverified transcription of the audio - confirm before use."
+_MISSING_NOTE = "A best guess of what is said - listen and confirm before using it."
 _MISSING_HEADING = "Audio says (best guess)"
 # A missing line ASR could not transcribe still needs a subtitle - tell the editor
 # what to do rather than reuse the wrong-text "could not determine the correct text".
 _MISSING_NO_TRANSCRIPT = (
-    "No subtitle here - speech was detected but could not be transcribed. "
+    "No subtitle here - speech was heard but the words could not be picked up. "
     "Listen to the audio and add a caption."
 )
 

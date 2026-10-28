@@ -60,7 +60,7 @@ def test_short_cue_never_flagged() -> None:
     events = [_cue("हाँ?", 0.0, 0.5)]
     results = align_script(events, [])
     assert results[0].verdict is Verdict.OK
-    assert "too short" in results[0].reason
+    assert "Too short to check" in results[0].reason
 
 
 def test_transcribe_full_concatenates_chunks_in_order() -> None:

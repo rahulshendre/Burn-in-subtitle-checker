@@ -204,7 +204,7 @@ def transcribe_lines(
         match = ratio / 100.0
         if ratio >= min_ratio:
             verdict = Verdict.OK
-            reason = f"heard words match the subtitle (match {ratio:.0f}%)"
+            reason = f"The audio matches the subtitle (match {ratio:.0f}%)"
         elif event.end - event.start < min_span:
             # The words diverge, but the caption is too short for the ASR to
             # transcribe reliably - not enough audio to accuse a subtitle. So
@@ -212,10 +212,10 @@ def transcribe_lines(
             # (the words differ). It is unverifiable: surfaced for a human to
             # listen, kept out of the "matching" list and the accuracy rate.
             verdict = Verdict.UNCHECKABLE
-            reason = f"line too short to verify against the audio (match {ratio:.0f}%)"
+            reason = f"Too short to check (match {ratio:.0f}%)"
         else:
             verdict = Verdict.TEXT_MISMATCH
-            reason = f"heard words differ from the subtitle (match {ratio:.0f}%)"
+            reason = f"The audio doesn't match the subtitle (match {ratio:.0f}%)"
         results.append(
             CheckResult(
                 start=event.start,
@@ -257,15 +257,15 @@ def skipped_lines(
         if claimed(event):
             continue
         if regions is not None and not event_has_speech(event, regions):
-            reason = "no speech under this line"
+            reason = "No speech heard under this subtitle"
         elif event.confidence < min_ocr_conf:
             reason = (
-                f"OCR read too unreliable to compare (confidence {event.confidence:.2f})"
+                "The subtitle was too hard to read to compare it with the audio"
             )
         elif len(event.text.split()) < min_words:
-            reason = "too short to compare word-for-word"
+            reason = "Too short to check"
         else:
-            reason = "nothing was transcribed for this line"
+            reason = "Couldn't pick up any speech for this line"
         skipped.append((event, reason))
     return skipped
 

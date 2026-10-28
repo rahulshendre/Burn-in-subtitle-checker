@@ -114,7 +114,7 @@ def test_short_line_mismatch_still_shown_in_ledger() -> None:
     assert len(rows) == 1
     assert rows[0].verdict is Verdict.UNCHECKABLE
     assert rows[0].heard_text == "पाँच छह सात आठ"
-    assert "too short" in rows[0].reason
+    assert "Too short to check" in rows[0].reason
 
 
 def test_skipped_lines_reason_per_gate() -> None:
@@ -134,16 +134,16 @@ def test_skipped_lines_reason_per_gate() -> None:
     ]
     reasons = {e.text: reason for e, reason in skipped_lines(events, results, regions)}
     assert "पहली सही लाइन है" not in reasons
-    assert "confidence 0.20" in reasons["गड़बड़ पाठ यहाँ है"]
-    assert reasons["दो शब्द"] == "too short to compare word-for-word"
-    assert reasons["गाने के ऊपर वाली लाइन"] == "no speech under this line"
-    assert reasons["सुनाई नहीं दिया कुछ"] == "nothing was transcribed for this line"
+    assert "too hard to read" in reasons["गड़बड़ पाठ यहाँ है"]
+    assert reasons["दो शब्द"] == "Too short to check"
+    assert reasons["गाने के ऊपर वाली लाइन"] == "No speech heard under this subtitle"
+    assert reasons["सुनाई नहीं दिया कुछ"] == "Couldn't pick up any speech for this line"
 
 
 def test_skipped_lines_without_regions_skips_speech_test() -> None:
     events = [SubtitleEvent(1.0, 2.0, "बिना क्षेत्र सूचना के", 0.1)]
     (_, reason), = skipped_lines(events, [], None)
-    assert "confidence 0.10" in reason
+    assert "too hard to read" in reason
 
 
 def _missing(start: float, end: float) -> CheckResult:
