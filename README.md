@@ -31,16 +31,26 @@ Alongside the mismatch check, the report grades how legible the subtitles are
 contrast, bigger text) and checks the subtitles against PlanetRead's subtitle
 guidelines.
 
+The reports are written for editors, not engineers: plain labels ("Subtitle on
+screen", "What the audio says", "Speech with no subtitle"), one Confidence figure
+per flag, and counts that add up. A second page lists only the mistakes, each with
+a suggested correction.
+
 ## Ways to run it
 
 - **Desktop app (Mac and Windows).** A double-click app that opens a page in
-  the browser: pick a video, pick the language, run the check, read the
-  report. The video stays on the computer; only cropped subtitle images and
-  short audio clips go to Sarvam. Needs a Sarvam API key.
+  the browser. Paste the Sarvam API key once (it is checked with Sarvam when you
+  save it, and the "Change API key" button replaces it later), pick a video and
+  the language, run the check, then click "Open report". Failures are explained
+  in plain words, and the full error goes to `app.log` in the app's
+  `Subtitle Checker` folder. The video stays on the computer; only cropped
+  subtitle images and short audio clips go to Sarvam.
   - Mac (Apple Silicon): `packaging/macos/build.sh` builds `Subtitle Checker.app`.
   - Windows (64-bit): the `windows` GitHub Actions workflow builds
-    `Subtitle-Checker-Setup.exe`, installs it on a Windows runner and checks it
-    starts. `packaging/windows/build.ps1` does the same build by hand.
+    `Subtitle-Checker-Setup.exe`, installs it on a Windows runner, checks that
+    the installed app starts and serves the current page, and attaches the
+    installer to the run. `packaging/windows/build.ps1` does the same build by hand.
+  - The packaged app uses port 8000; set `SUBTITLE_CHECKER_PORT` to use another.
 - **Command line.**
 
   ```bash
@@ -52,7 +62,7 @@ guidelines.
 ## Where the code is
 
 The work is built stage by stage, each on its own reviewable branch. The
-branches stack in the order below, so the tip branch `feat/windows-app`
+branches stack in the order below, so the tip branch `feat/usability-fixes`
 contains everything.
 
 | # | Branch | What it adds |
@@ -87,12 +97,14 @@ contains everything.
 | 28 | `feat/short-line-uncheckable` | mark short low-match lines as uncheckable, merge flicker splits |
 | 29 | `feat/marathi` | Marathi: drop image narrations and overlong OCR blocks |
 | 30 | `feat/local-app` | desktop app (browser page, key, progress, history), Mac build |
-| 31 | `feat/windows-app` | Windows Setup.exe installer, built and tested in CI (current tip) |
+| 31 | `feat/windows-app` | Windows Setup.exe installer, built and tested in CI |
+| 32 | `feat/hardening` | time out stuck ffmpeg calls, reject unsupported languages, check ffmpeg, note cloud use, pin matra tests |
+| 33 | `feat/usability-fixes` | fixes from a usability review: Open report button, API key check and Change API key, plain error messages, plain-word reports, one confidence number; Mac and Windows apps rebuilt (current tip) |
 
 ## Development
 
 ```bash
-git checkout feat/windows-app
+git checkout feat/usability-fixes
 pip install -e ".[dev,audio,asr,vision]"
 ruff check .
 pytest
@@ -105,5 +117,5 @@ Extras: `audio` (voice activity detection on onnxruntime), `asr` and `vision`
 
 ## Status
 
-Hindi and Marathi work end to end. 306 tests pass on macOS and on Windows (CI).
+Hindi and Marathi work end to end. 394 tests pass on macOS and on Windows (CI).
 The branches above are meant to be reviewed as PRs in stack order.
