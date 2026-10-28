@@ -12,14 +12,19 @@ Install
 
 Use
 1. Open Subtitle Checker. A page opens in your browser.
-2. First time only: paste the Sarvam API key and click Save.
+2. First time only: paste the Sarvam API key and click Save. The app checks
+   the key with Sarvam. If it says the key was not accepted, check that you
+   copied all of it. To use a different key later, click "Change API key"
+   (top right).
 3. Choose a video, pick the language, click "Run check". Keep the page open;
    the bar shows how far it has got.
-4. The report opens when it is done. Old reports stay under "Past checks".
+4. When the check is done, click "Open report". Old reports stay under
+   "Past checks" (reload the page to see the newest one there).
 5. Click "Quit app" (top right) when you are finished.
 
 Where things are: your reports are in the "Subtitle Checker" folder in your
-home folder. If something goes wrong, send the app.log file from that folder.
+home folder. The page explains most problems in plain words. If it says
+"Something went wrong", send the app.log file from that folder.
 
 Privacy: the video stays on your computer. Only small cropped subtitle images
 and short audio clips are sent to Sarvam to read and listen.
