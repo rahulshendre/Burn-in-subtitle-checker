@@ -42,7 +42,9 @@ def main() -> None:
     home.mkdir(parents=True, exist_ok=True)
     log = open(home / "app.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
     sys.stdout = sys.stderr = log
-    serve_app(home)
+    # Port 8000 unless another program already uses it; then set this to a free one.
+    port = os.environ.get("SUBTITLE_CHECKER_PORT", "")
+    serve_app(home, port=int(port) if port.isdigit() else 8000)
 
 
 if __name__ == "__main__":
