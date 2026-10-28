@@ -31,7 +31,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-from subtitle_checker.report.keycheck import RUN_REJECTED, check_key, is_key_rejection
+from subtitle_checker.report.errors import plain_error, plain_exit_message, record_failure
+from subtitle_checker.report.keycheck import check_key
 from subtitle_checker.report.webui import _STYLE, discover_reports
 
 LANGUAGES = {"hi": "Hindi", "mr": "Marathi"}
@@ -167,7 +168,6 @@ class Job:
             "report": self.report,
             "error": self.error,
             "elapsed": int(now - self.started) if self.started else 0,
-            "log": self.log[-8:],
         }
 
 
@@ -211,11 +211,11 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
             job.report = report.relative_to(home).as_posix()
             job.state = "done"
         else:
-            job.state = "error"
-            job.error = job.log[-1] if job.log else "the check did not produce a report"
+            job.state, job.error = "error", plain_exit_message(job.log)
+            record_failure(home, video.name, None, job.log)
     except Exception as exc:  # surface any pipeline failure on the page
-        job.state = "error"
-        job.error = RUN_REJECTED if is_key_rejection(exc) else f"{type(exc).__name__}: {exc}"
+        job.state, job.error = "error", plain_error(exc)
+        record_failure(home, video.name, exc, job.log)
     finally:
         # The report embeds the frames and audio it needs; the uploaded copies
         # would only fill the disk.
@@ -290,6 +290,8 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         "subtitles burned into the video.</p>"
         '<label class="lbl" for="lang">Language</label>'
         f'<select id="lang">{lang_opts}</select>'
+        '<p class="muted small">The video stays on this computer. Only the subtitle strips '
+        "and short audio clips are sent to Sarvam to be read.</p>"
         f'<div class="row"><button id="run"{"" if has_key else " disabled"}>Run check</button></div>'
         '<div id="status" class="status" hidden></div>'
         "</section>"
@@ -318,14 +320,12 @@ _APP_STYLE = """<style>
   .muted { color:#667; } .small { font-size:.8rem; margin:.3rem 0 0; }
   .status { margin-top:1rem; padding:.7rem .9rem; border-radius:6px; background:#f3f7f4; }
   .status.error { background:#fdeeee; color:#8a1f1f; }
-  .status pre { margin:.5rem 0 0; font-size:.75rem; white-space:pre-wrap; color:#556; }
   .track { height:.8rem; border-radius:.4rem; background:#dfe8e2; overflow:hidden; }
   .fill { height:100%; background:#2a6; transition:width .8s ease; }
   .pct { margin:.45rem 0 .3rem; font-size:.85rem; color:#445; }
   .steps { list-style:none; padding:0; margin:.4rem 0 0; font-size:.9rem; }
   .steps li { padding:.12rem 0; } .steps span { display:inline-block; width:1.3rem; }
   .steps .done { color:#1f6f43; } .steps .now { font-weight:600; } .steps .todo { color:#99a; }
-  details { margin-top:.5rem; font-size:.8rem; color:#667; }
   .openreport { display:inline-block; margin-top:.8rem; padding:.6rem 1.6rem; border-radius:5px;
                 background:#2a6; color:#fff; font-weight:600; text-decoration:none; }
   .openreport:hover { background:#1f6f43; }
@@ -346,15 +346,14 @@ var STEPS=['Uploading the video','Reading the subtitles','Checking the audio','B
 function esc(t){return t.replace(/[&<>]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 function mins(s){return s<60?'under a minute':'about '+Math.ceil(s/60)+' min';}
-function bar(pct,step,note,log){box.hidden=false;box.className='status';
+function bar(pct,step,note){box.hidden=false;box.className='status';
   var items=STEPS.map(function(n,i){var c=i<step?'done':(i===step?'now':'todo');
     var m=i<step?'&#10003;':(i===step?'&#9654;':'&middot;');
     return '<li class="'+c+'"><span>'+m+'</span>'+n+'</li>';}).join('');
   box.innerHTML='<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'
-    +'<div class="pct"><b>'+pct+'%</b> '+note+'</div><ol class="steps">'+items+'</ol>'
-    +(log?'<details><summary>Details</summary><pre>'+esc(log)+'</pre></details>':'');}
-function fail(msg,log){box.hidden=false;box.className='status error';
-  box.innerHTML=esc(msg)+(log?'<pre>'+esc(log)+'</pre>':'');$('run').disabled=false;}
+    +'<div class="pct"><b>'+pct+'%</b> '+note+'</div><ol class="steps">'+items+'</ol>';}
+function fail(msg){box.hidden=false;box.className='status error';
+  box.innerHTML=esc(msg);$('run').disabled=false;}
 function saveKey(){
   var k=$('key').value.trim(); if(!k){$('keymsg').textContent='Paste the key first.';return;}
   $('savekey').disabled=true; $('keymsg').style.color='#667'; $('keymsg').textContent='Checking the key...';
@@ -374,11 +373,11 @@ function upload(file,onpct){return new Promise(function(ok,no){
   x.onerror=function(){no(new Error('Upload failed.'));}; x.send(file);});}
 function poll(){fetch('/job').then(function(r){return r.json();}).then(function(j){
   if(j.state==='running'){bar(j.percent,j.stage+1,'&middot; '+mins(j.left)+' left (estimate)'
-    +' &middot; keep this page open',j.log.join('\\n'));setTimeout(poll,1000);}
+    +' &middot; keep this page open');setTimeout(poll,1000);}
   else if(j.state==='done'){bar(100,STEPS.length,'Done.');
     box.insertAdjacentHTML('beforeend','<a class="openreport" href="/file/'+encodeURI(j.report)
       +'" target="_blank" rel="noopener">Open report</a>');$('run').disabled=false;}
-  else if(j.state==='error'){fail('The check failed: '+j.error,j.log.join('\\n'));}});}
+  else if(j.state==='error'){fail(j.error);}});}
 $('run').onclick=function(){
   var v=$('video').files[0], s=$('srt').files[0];
   if(!v){fail('Pick a video first.');return;}

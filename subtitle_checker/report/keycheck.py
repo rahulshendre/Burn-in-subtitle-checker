@@ -45,8 +45,8 @@ def check_key(key: str, post: Callable | None = None) -> str | None:
     return None
 
 
-def is_key_rejection(exc: BaseException) -> bool:
-    """True when a failed Sarvam call was refused over the key (HTTP 401 or 403).
+def http_status(exc: BaseException) -> int | None:
+    """The HTTP status behind a failed Sarvam call, or None when it had none.
 
     Covers both client styles in the pipeline: `requests` (response.status_code)
     for speech-to-text and the Sarvam SDK (status_code on the error) for OCR.
@@ -54,4 +54,9 @@ def is_key_rejection(exc: BaseException) -> bool:
     status = getattr(exc, "status_code", None)
     if status is None:
         status = getattr(getattr(exc, "response", None), "status_code", None)
-    return status in _REJECTED_STATUS
+    return status
+
+
+def is_key_rejection(exc: BaseException) -> bool:
+    """True when a failed Sarvam call was refused over the key (HTTP 401 or 403)."""
+    return http_status(exc) in _REJECTED_STATUS

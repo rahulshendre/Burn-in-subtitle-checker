@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
-from subtitle_checker.report import app
+from subtitle_checker.report import app, errors
 from subtitle_checker.report.app import (
     Job,
     load_key,
@@ -192,14 +192,61 @@ def test_run_check_reports_a_pipeline_failure(tmp_path, monkeypatch):
     video.write_bytes(b"v")
 
     def boom(args):
-        raise RuntimeError("Sarvam said 401")
+        raise RuntimeError("shape mismatch (3, 0)")
 
     monkeypatch.setattr(cli, "_run_check", boom)
     job = Job(state="running")
     app.run_check(job, tmp_path, video, None, "hi")
 
     assert job.state == "error"
-    assert "401" in job.error
+    assert job.error == errors.UNEXPECTED  # no developer text on the page
+    assert "shape mismatch" in (tmp_path / "app.log").read_text(encoding="utf-8")
+
+
+def test_run_check_explains_a_video_that_cannot_be_read(tmp_path, monkeypatch):
+    import subprocess
+
+    from subtitle_checker import cli
+
+    video = tmp_path / "Clip.mp4"
+    video.write_bytes(b"not a video")
+
+    def boom(args):
+        raise subprocess.CalledProcessError(1, ["ffprobe", "-v", "error", str(video)])
+
+    monkeypatch.setattr(cli, "_run_check", boom)
+    job = Job(state="running")
+    app.run_check(job, tmp_path, video, None, "hi")
+
+    assert job.error == errors.VIDEO_UNREADABLE
+    assert "ffprobe" not in job.error
+
+
+def test_run_check_explains_an_error_exit_without_a_report(tmp_path, monkeypatch):
+    from subtitle_checker import cli
+
+    video = tmp_path / "Clip.mp4"
+    video.write_bytes(b"v")
+
+    def quiet_failure(args):
+        print("no subtitle cues parsed from: x.srt", file=sys.stderr)
+        return 2
+
+    monkeypatch.setattr(cli, "_run_script_check", quiet_failure)
+    job = Job(state="running")
+    app.run_check(job, tmp_path, video, tmp_path / "x.srt", "hi")
+
+    assert job.state == "error"
+    assert job.error == errors.SRT_EMPTY
+
+
+def test_the_page_no_longer_shows_the_programs_raw_output():
+    page = render_app([], has_key=True)
+    assert "<details>" not in page and "Details" not in page
+    assert "j.log" not in page
+    assert "The check failed: " not in page  # messages are now whole sentences
+    assert "stays on this computer" in page  # the privacy note the raw log used to carry
+    assert "log" not in Job(state="running").as_json()
 
 
 def test_run_check_tells_the_user_when_sarvam_rejects_the_key(tmp_path, monkeypatch):
