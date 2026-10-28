@@ -317,6 +317,9 @@ _APP_STYLE = """<style>
   .steps li { padding:.12rem 0; } .steps span { display:inline-block; width:1.3rem; }
   .steps .done { color:#1f6f43; } .steps .now { font-weight:600; } .steps .todo { color:#99a; }
   details { margin-top:.5rem; font-size:.8rem; color:#667; }
+  .openreport { display:inline-block; margin-top:.8rem; padding:.6rem 1.6rem; border-radius:5px;
+                background:#2a6; color:#fff; font-weight:600; text-decoration:none; }
+  .openreport:hover { background:#1f6f43; }
   .runs { list-style:none; padding:0; margin:0; }
   .runs li { padding:.45rem 0; border-bottom:1px solid #eef; }
   .runs a { color:#1f6f43; font-weight:600; } .runs a.sub { font-weight:400; font-size:.85rem; }
@@ -352,8 +355,9 @@ function upload(file,onpct){return new Promise(function(ok,no){
 function poll(){fetch('/job').then(function(r){return r.json();}).then(function(j){
   if(j.state==='running'){bar(j.percent,j.stage+1,'&middot; '+mins(j.left)+' left (estimate)'
     +' &middot; keep this page open',j.log.join('\\n'));setTimeout(poll,1000);}
-  else if(j.state==='done'){bar(100,STEPS.length,'Done. Opening the report...');
-    window.open('/file/'+encodeURI(j.report),'_blank');setTimeout(function(){location.reload();},1500);}
+  else if(j.state==='done'){bar(100,STEPS.length,'Done.');
+    box.insertAdjacentHTML('beforeend','<a class="openreport" href="/file/'+encodeURI(j.report)
+      +'" target="_blank" rel="noopener">Open report</a>');$('run').disabled=false;}
   else if(j.state==='error'){fail('The check failed: '+j.error,j.log.join('\\n'));}});}
 $('run').onclick=function(){
   var v=$('video').files[0], s=$('srt').files[0];

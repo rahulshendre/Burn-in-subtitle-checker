@@ -167,6 +167,16 @@ def test_job_json_reports_percent_and_advances_stages(tmp_path):
     assert job.as_json()["percent"] == 100
 
 
+def test_finished_check_shows_an_open_report_button_not_a_popup():
+    # A tab opened minutes after the click is blocked by the browser's pop-up
+    # blocker, and a reload would wipe the message, so the page offers a link.
+    page = render_app([], has_key=True)
+    assert "window.open" not in page
+    assert "},1500)" not in page  # the old reload-after-1.5s that cleared the message
+    assert 'class="openreport"' in page
+    assert ">Open report<" in page
+
+
 def test_render_app_has_a_quit_button():
     page = render_app([], has_key=True)
     assert 'id="quit"' in page
