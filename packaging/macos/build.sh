@@ -18,6 +18,9 @@ if [ ! -x "$WORK/venv/bin/pyinstaller" ]; then
   "$WORK/venv/bin/pip" install -q --upgrade pip
 fi
 "$WORK/venv/bin/pip" install -q "$ROOT[asr,vision,audio]" pyinstaller
+# The version number never changes, so pip keeps a copy of the project left in a
+# reused venv by an earlier build. Replace it so the app is built from this source.
+"$WORK/venv/bin/pip" install -q --force-reinstall --no-deps "$ROOT"
 
 for tool in ffmpeg ffprobe; do
   if [ ! -x "$WORK/bin/$tool" ]; then
