@@ -445,3 +445,8 @@ def test_two_checks_in_the_same_minute_show_different_times():
     first = app._fmt_when(1_700_000_000.0)
     second = app._fmt_when(1_700_000_030.0)
     assert first != second and first.count(":") == 2
+
+
+def test_the_change_key_box_can_be_cancelled_only_when_a_key_is_saved():
+    assert 'id="cancelkey"' in render_app([], has_key=True)
+    assert 'id="cancelkey"' not in render_app([], has_key=False)  # nothing to go back to

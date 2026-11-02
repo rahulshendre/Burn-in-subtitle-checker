@@ -354,7 +354,9 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
            else "Needed once. It is saved on this computer only.")
         + "</p>"
         '<div class="row"><input id="key" type="password" placeholder="Paste the key">'
-        '<button id="savekey">Save</button></div>'
+        '<button id="savekey">Save</button>'
+        + ('<button id="cancelkey" class="plain">Cancel</button>' if has_key else "")
+        + "</div>"
         '<p id="keymsg" class="keymsg" role="alert"></p></section>'
     )
     change_key = '<button id="changekey" class="quit">Change API key</button>' if has_key else ""
@@ -416,6 +418,7 @@ _APP_STYLE = """<style>
   .runs li { padding:.45rem 0; border-bottom:1px solid #eef; }
   .runs a { color:#1f6f43; font-weight:600; } .runs a.sub { font-weight:400; font-size:.85rem; }
   .when { float:right; color:#889; font-size:.8rem; }
+  .plain { background:transparent; color:#445; border:1px solid #ccd; }
   .quit { background:transparent; border:1px solid rgba(255,255,255,.6); font-weight:400; }
   .barbtns { display:flex; gap:.6rem; }
   .hint { margin:.6rem 0 0; padding:.5rem .7rem; background:#fff6dd; color:#6b4e00;
@@ -449,6 +452,8 @@ function saveKey(){
     $('keymsg').textContent='Could not reach the app. Is it still running?';});}
 $('savekey').onclick=saveKey;
 $('key').onkeydown=function(e){if(e.key==='Enter'){saveKey();}};
+if($('cancelkey')){$('cancelkey').onclick=function(){$('keycard').hidden=true;
+  $('key').value='';$('keymsg').textContent='';};}
 if($('changekey')){$('changekey').onclick=function(){$('keycard').hidden=false;$('key').focus();
   $('keycard').scrollIntoView();};}
 function upload(file,onpct){return new Promise(function(ok,no){
