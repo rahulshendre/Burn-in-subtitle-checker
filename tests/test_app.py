@@ -330,3 +330,34 @@ def test_server_refuses_port_sharing_on_windows():
     import sys
 
     assert app._Server.allow_reuse_address == (sys.platform != "win32")
+
+
+def test_a_busy_port_is_skipped_when_another_program_holds_it(tmp_path):
+    import socket
+    import threading
+
+    other = socket.socket()
+    other.bind(("127.0.0.1", 0))
+    other.listen()
+    taken = other.getsockname()[1]
+    try:
+        handler = app._make_handler(tmp_path, Job(), threading.Lock())
+        httpd, port = app._bind("127.0.0.1", taken, handler)
+        assert httpd is not None and port != taken
+        httpd.server_close()
+    finally:
+        other.close()
+
+
+def test_a_second_copy_shows_the_running_app_instead_of_starting(tmp_path):
+    import threading
+
+    handler = app._make_handler(tmp_path, Job(), threading.Lock())
+    first, port = app._bind("127.0.0.1", 0, handler)
+    threading.Thread(target=first.serve_forever, daemon=True).start()
+    try:
+        second, shown = app._bind("127.0.0.1", port, handler)
+        assert second is None and shown == port
+    finally:
+        first.shutdown()
+        first.server_close()

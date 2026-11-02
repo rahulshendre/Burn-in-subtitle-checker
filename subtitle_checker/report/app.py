@@ -25,6 +25,7 @@ import sys
 import threading
 import time
 import unicodedata
+import urllib.request
 import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -495,6 +496,32 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
     return Handler
 
 
+def _is_this_app(host: str, port: int) -> bool:
+    """True when what answers on this port is Subtitle Checker itself."""
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/job", timeout=2) as reply:
+            return "stages" in json.loads(reply.read())
+    except Exception:  # nothing there, or some other program: either way not us
+        return False
+
+
+def _bind(host: str, port: int, handler: type[BaseHTTPRequestHandler]) -> tuple[_Server | None, int]:
+    """A server on `port`, or on the next free one when another program holds it.
+
+    Returns (None, port) when Subtitle Checker is already running on a port, so
+    the caller can show that one instead of starting a second copy.
+    """
+    for candidate in (port, *range(port + 1, port + 20), 0):
+        try:
+            httpd = _Server((host, candidate), handler)
+        except OSError:
+            if candidate and _is_this_app(host, candidate):
+                return None, candidate
+            continue
+        return httpd, httpd.server_address[1]
+    raise OSError(f"No free port found near {port}")
+
+
 def serve_app(
     home: Path | None = None,
     *,
@@ -507,10 +534,9 @@ def serve_app(
     home.mkdir(parents=True, exist_ok=True)
     load_key(home)
     handler = _make_handler(home, Job(), threading.Lock())
+    httpd, port = _bind(host, port, handler)
     url = f"http://{host}:{port}/"
-    try:
-        httpd = _Server((host, port), handler)
-    except OSError:
+    if httpd is None:
         # Opened a second time while already running: show the running app.
         print(f"Subtitle Checker is already running at {url}")
         if open_browser:
