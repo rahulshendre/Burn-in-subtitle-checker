@@ -282,3 +282,9 @@ def test_accuracy_bar_appears_in_report():
 def test_accuracy_bar_absent_for_empty_results():
     out = render_report([], FakeEvidence(), title="Empty")
     assert '<div class="acc-bar">' not in out
+
+
+def test_a_clip_with_nothing_to_check_does_not_claim_every_line_matches():
+    out = render_report([], FakeEvidence(), title="Demo")
+    assert "Nothing to check" in out
+    assert "every checked line matches" not in out

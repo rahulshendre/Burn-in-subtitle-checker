@@ -220,11 +220,14 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         for v in _VERDICT_ORDER
         if counts.get(v)
     )
-    headline = (
-        f"{n_flags} flag(s) for review"
-        if n_flags
-        else "No flags - every checked line matches the audio"
-    ) + _unchecked_suffix(counts.get(Verdict.UNCHECKABLE, 0))
+    if not results:
+        headline = "Nothing to check: no subtitles or speech were found in this video"
+    else:
+        headline = (
+            f"{n_flags} flag(s) for review"
+            if n_flags
+            else "No flags - every checked line matches the audio"
+        ) + _unchecked_suffix(counts.get(Verdict.UNCHECKABLE, 0))
     return (
         f'<header><h1>{html.escape(title)}</h1>'
         f'<p class="sub">Burn-in subtitle checker · {html.escape(stamp)}</p>'
