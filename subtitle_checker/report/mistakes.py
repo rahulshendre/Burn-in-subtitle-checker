@@ -76,11 +76,14 @@ def render_mistakes(
 def _header(title: str, results: list[CheckResult], flags: list[CheckResult], stamp: str) -> str:
     n = sum(1 for r in flags if r.verdict is not Verdict.UNCHECKABLE)
     unchecked = len(flags) - n
-    headline = (
-        f"{n} subtitle mistake{'s' if n != 1 else ''} to review"
-        if n
-        else "No mistakes found - every checked line matches the audio"
-    ) + _unchecked_suffix(unchecked)
+    if not results:
+        headline = "Nothing to check: no subtitles or speech were found in this video"
+    else:
+        headline = (
+            f"{n} subtitle mistake{'s' if n != 1 else ''} to review"
+            if n
+            else "No mistakes found - every checked line matches the audio"
+        ) + _unchecked_suffix(unchecked)
     return (
         f"<header><h1>{html.escape(title)}</h1>"
         f'<p class="sub">Subtitle mistakes to fix &middot; {html.escape(stamp)}</p>'

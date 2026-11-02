@@ -317,3 +317,11 @@ def test_the_mistakes_page_name_follows_the_report_name():
 def test_a_wide_table_scrolls_inside_itself_not_the_page():
     out = render_report([], FakeEvidence(), title="Demo")
     assert ".ledger { overflow-x:auto; }" in out
+
+
+def test_the_mistakes_page_for_an_empty_clip_does_not_claim_every_line_matches():
+    from subtitle_checker.report.mistakes import render_mistakes
+
+    out = render_mistakes([], FakeEvidence(), title="Demo")
+    assert "Nothing to check" in out
+    assert "every checked line matches" not in out
