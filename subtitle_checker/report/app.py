@@ -37,6 +37,7 @@ from urllib.parse import quote, unquote
 
 from subtitle_checker.report.errors import (
     NO_SOUND,
+    NOT_A_VIDEO,
     plain_error,
     plain_exit_message,
     record_failure,
@@ -100,17 +101,28 @@ def video_duration(video: Path) -> float:
         return 0.0
 
 
-def has_audio(video: Path) -> bool:
-    """False only when the file can be read and has no sound track."""
+def video_problem(video: Path) -> str | None:
+    """Plain words for why this file cannot be checked, or None when it looks fine.
+
+    Only things the user can fix are named. A file that cannot be read at all is
+    left alone here and gets the "can't be read" message from the pipeline.
+    """
     try:
         proc = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
-             "stream=index", "-of", "csv=p=0", str(video)],
+            ["ffprobe", "-v", "error", "-show_entries", "format=format_name:stream=codec_type",
+             "-of", "json", str(video)],
             capture_output=True, text=True, check=True, timeout=30,
         )
-    except (OSError, subprocess.SubprocessError):
-        return True  # an unreadable file fails later with its own message
-    return bool(proc.stdout.strip())
+        info = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    kinds = [stream.get("codec_type") for stream in info.get("streams", [])]
+    form = info.get("format", {}).get("format_name", "")
+    if "video" not in kinds or form.endswith("_pipe") or form.startswith("image2"):
+        return NOT_A_VIDEO  # a photo has a "video" stream but is a single picture
+    if "audio" not in kinds:
+        return NO_SOUND
+    return None
 
 
 def default_home() -> Path:
@@ -577,9 +589,10 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
             if not video.is_file():
                 self._send(400, b"The video did not upload. Try again.", "text/plain")
                 return
-            if not has_audio(video):
+            problem = video_problem(video)
+            if problem:
                 video.unlink(missing_ok=True)
-                self._send(400, NO_SOUND.encode("utf-8"), "text/plain")
+                self._send(400, problem.encode("utf-8"), "text/plain")
                 return
             with lock:
                 if job.state == "running":

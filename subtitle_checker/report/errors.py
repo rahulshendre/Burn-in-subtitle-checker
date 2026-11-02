@@ -21,6 +21,7 @@ VIDEO_UNREADABLE = "This video file can't be read. Try exporting it again as MP4
 VIDEO_TOO_SLOW = (
     "Reading this video took too long. Try exporting it again as MP4, or use a shorter video."
 )
+NOT_A_VIDEO = "This file is not a video. Choose a video file, for example an MP4."
 NO_SOUND = (
     "This video has no sound, so there is nothing to compare the subtitles with. "
     "Choose a video that has sound."

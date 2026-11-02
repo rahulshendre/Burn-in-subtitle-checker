@@ -384,27 +384,39 @@ def test_clearing_leftovers_works_when_the_folders_do_not_exist(tmp_path):
     app.clear_leftovers(tmp_path)  # a brand new install has no uploads or runs yet
 
 
-def test_a_video_without_a_sound_track_is_recognised(tmp_path, monkeypatch):
+def _probe_says(monkeypatch, form, kinds):
+    import json
     import subprocess
 
-    def fake(stdout):
-        return lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=stdout, stderr="")
+    out = json.dumps({"format": {"format_name": form}, "streams": [{"codec_type": k} for k in kinds]})
+    monkeypatch.setattr(
+        app.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=out, stderr="")
+    )
 
+
+def test_a_video_without_a_sound_track_is_named(tmp_path, monkeypatch):
     clip = tmp_path / "clip.mp4"
-    monkeypatch.setattr(app.subprocess, "run", fake("0\n"))
-    assert app.has_audio(clip) is True
-    monkeypatch.setattr(app.subprocess, "run", fake(""))
-    assert app.has_audio(clip) is False
+    _probe_says(monkeypatch, "mov,mp4", ["video", "audio"])
+    assert app.video_problem(clip) is None
+    _probe_says(monkeypatch, "mov,mp4", ["video"])
+    assert app.video_problem(clip) == errors.NO_SOUND
 
 
-def test_an_unreadable_video_is_not_called_silent(tmp_path, monkeypatch):
+def test_a_photo_is_called_a_photo_not_a_silent_video(tmp_path, monkeypatch):
+    _probe_says(monkeypatch, "png_pipe", ["video"])
+    assert app.video_problem(tmp_path / "photo.png") == errors.NOT_A_VIDEO
+    _probe_says(monkeypatch, "mov,mp4", ["audio"])
+    assert app.video_problem(tmp_path / "song.mp4") == errors.NOT_A_VIDEO
+
+
+def test_an_unreadable_video_is_left_to_the_can_not_be_read_message(tmp_path, monkeypatch):
     import subprocess
 
     def boom(*a, **k):
         raise subprocess.CalledProcessError(1, "ffprobe")
 
     monkeypatch.setattr(app.subprocess, "run", boom)
-    assert app.has_audio(tmp_path / "broken.mp4") is True  # it gets the "can't be read" message
+    assert app.video_problem(tmp_path / "broken.mp4") is None
 
 
 def _saved_results(folder, verdicts):
