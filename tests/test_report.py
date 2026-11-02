@@ -288,3 +288,12 @@ def test_a_clip_with_nothing_to_check_does_not_claim_every_line_matches():
     out = render_report([], FakeEvidence(), title="Demo")
     assert "Nothing to check" in out
     assert "every checked line matches" not in out
+
+
+def test_a_missing_full_stop_is_not_highlighted_as_a_difference():
+    from subtitle_checker.report.html import _diff_texts
+
+    written, heard = _diff_texts("ठीक है", "ठीक है।")
+    assert "<mark" not in written and "<mark" not in heard
+    written, heard = _diff_texts("हमारी बात", "हमारि बात।")
+    assert "<mark" in written  # a real vowel difference is still marked

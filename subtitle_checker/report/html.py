@@ -617,10 +617,17 @@ def _diff_texts(written: str, heard: str) -> tuple[str, str]:
     written_out: list[str] = []
     heard_out: list[str] = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        changed = tag != "equal"
+        # A full stop or danda the speech cannot show is not a mistake to mark.
+        changed = tag != "equal" and not (
+            _only_punctuation("".join(w[i1:i2])) and _only_punctuation("".join(h[j1:j2]))
+        )
         written_out.append(_mark("".join(w[i1:i2]), changed))
         heard_out.append(_mark("".join(h[j1:j2]), changed))
     return "".join(written_out), "".join(heard_out)
+
+
+def _only_punctuation(text: str) -> bool:
+    return all(unicodedata.category(c)[0] in "PZ" for c in text)
 
 
 def _mark(text: str, changed: bool) -> str:
