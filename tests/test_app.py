@@ -435,7 +435,7 @@ def test_a_report_with_almost_every_line_flagged_asks_to_check_the_language(tmp_
 
     _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 8)
     note = app.language_hint(tmp_path, tmp_path / "clip.mp4", "mr")
-    assert "8 of 8" in note and "Marathi" in note and "choose Hindi" in note
+    assert "8 of 8" in note and "run as Marathi" in note and "Hindi and Marathi" in note
 
 
 def test_a_normal_report_gets_no_language_hint(tmp_path):
@@ -448,9 +448,16 @@ def test_a_normal_report_gets_no_language_hint(tmp_path):
 def test_a_very_short_report_gets_no_language_hint(tmp_path):
     from subtitle_checker.artifacts import Verdict
 
-    _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 3)
+    _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 2)
     assert app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi") == ""
     assert app.language_hint(tmp_path / "nothing", tmp_path / "clip.mp4", "hi") == ""
+
+
+def test_a_video_in_a_language_the_app_does_not_read_also_gets_the_hint(tmp_path):
+    from subtitle_checker.artifacts import Verdict
+
+    _saved_results(tmp_path, [Verdict.MISSING_SUBTITLE] * 3)  # a Tamil clip run as Hindi
+    assert "3 of 3" in app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi")
 
 
 def test_two_checks_in_the_same_minute_show_different_times():
@@ -494,3 +501,10 @@ def test_the_page_has_an_open_folder_button_that_opens_the_app_folder(tmp_path, 
         server.shutdown()
         server.server_close()
     assert opened == [tmp_path]
+
+
+def test_a_short_clip_with_a_few_real_mistakes_gets_no_language_hint(tmp_path):
+    from subtitle_checker.artifacts import Verdict
+
+    _saved_results(tmp_path, [Verdict.OK] + [Verdict.TEXT_MISMATCH] * 3)  # the planted-mistake demo clip
+    assert app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi") == ""

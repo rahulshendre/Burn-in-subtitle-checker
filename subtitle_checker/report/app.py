@@ -298,7 +298,8 @@ def clear_leftovers(home: Path) -> None:
                 shutil.rmtree(folder, ignore_errors=True)
 
 
-_MIN_LINES_FOR_HINT = 5
+_MIN_LINES_FOR_HINT = 3
+_LINES_FOR_PARTIAL = 5  # below this, only a clip with every line flagged gets the note
 _MOST_FLAGGED = 0.7
 
 
@@ -322,11 +323,12 @@ def language_hint(out_dir: Path, video: Path, lang: str) -> str:
         return ""
     if stats["flagged"] / stats["checkable"] < _MOST_FLAGGED:
         return ""
-    other = "Marathi" if lang == "hi" else "Hindi"
+    if stats["checkable"] < _LINES_FOR_PARTIAL and stats["flagged"] < stats["checkable"]:
+        return ""  # a short clip with a few real mistakes looks like this too
     return (
         f"Most lines were flagged ({stats['flagged']} of {stats['checkable']}). "
-        f"This check was run as {LANGUAGES.get(lang, lang)}. "
-        f"If the video is in {other}, choose {other} and run it again."
+        f"This check was run as {LANGUAGES.get(lang, lang)}. If the video is in another "
+        "language, choose that language and run it again. The app reads Hindi and Marathi."
     )
 
 
