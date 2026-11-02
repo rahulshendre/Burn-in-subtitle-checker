@@ -255,6 +255,17 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
                 upload.unlink(missing_ok=True)
 
 
+def open_folder(home: Path) -> None:
+    """Show the app's folder in Finder or Explorer."""
+    try:
+        if sys.platform == "win32":
+            os.startfile(home)  # type: ignore[attr-defined]  # noqa: S606 (Windows only)
+        else:
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(home)])
+    except OSError:
+        pass  # no file manager: the folder path is in the guide
+
+
 def clear_leftovers(home: Path) -> None:
     """Remove what a check that never finished left behind.
 
@@ -361,9 +372,10 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         '<p id="keymsg" class="keymsg" role="alert"></p></section>'
     )
     change_key = '<button id="changekey" class="quit">Change API key</button>' if has_key else ""
+    open_files = '<button id="openfolder" class="quit">Open folder</button>'
     body = (
         f'<div class="bar"><div class="brand">{html.escape(title)}</div>'
-        f'<div class="barbtns">{change_key}<button id="quit" class="quit">Quit app</button></div>'
+        f'<div class="barbtns">{open_files}{change_key}<button id="quit" class="quit">Quit app</button></div>'
         "</div>"
         '<main class="wrap">'
         + key_card
@@ -487,6 +499,7 @@ $('run').onclick=function(){
     poll();}).catch(function(e){fail(e.message);});};
 fetch('/job').then(function(r){return r.json();}).then(function(j){
   if(j.state==='running'){$('run').disabled=true;poll();}});
+$('openfolder').onclick=function(){fetch('/open-folder',{method:'POST'});};
 $('quit').onclick=function(){
   fetch('/job').then(function(r){return r.json();}).then(function(j){
     if(j.state==='running'&&!confirm('A check is running. Quit anyway?')){return;}
@@ -543,6 +556,9 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
                 else:
                     save_key(home, key)
                     self._send(200, b"ok", "text/plain")
+            elif self.path == "/open-folder":
+                open_folder(home)
+                self._send(200, b"ok", "text/plain")
             elif self.path == "/quit":
                 self._send(200, b"bye", "text/plain")
                 threading.Thread(target=self.server.shutdown, daemon=True).start()

@@ -463,3 +463,22 @@ def test_past_checks_refresh_when_a_check_finishes_without_reloading():
                         "when": 1_700_000_000.0}], has_key=True)
     assert '<div id="runs">' in page and "clip" in page
     assert "refreshRuns();" in page  # the finished-check branch calls it
+
+
+def test_the_page_has_an_open_folder_button_that_opens_the_app_folder(tmp_path, monkeypatch):
+    import urllib.request
+
+    assert 'id="openfolder"' in render_app([], has_key=True)
+    opened = []
+    monkeypatch.setattr(app, "open_folder", lambda home: opened.append(home))
+    server = _serve(tmp_path)
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_address[1]}/open-folder", data=b"", method="POST"
+        )
+        with urllib.request.urlopen(req) as resp:
+            assert resp.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert opened == [tmp_path]
