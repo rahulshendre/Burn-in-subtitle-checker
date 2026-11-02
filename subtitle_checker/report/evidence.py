@@ -64,6 +64,12 @@ def _run(cmd: list[str]) -> bytes | None:
     return proc.stdout or None
 
 
+def _mistakes_name(report_path: Path) -> str | None:
+    """File name of the mistakes page written beside a report, if the name follows the pattern."""
+    suffix = "_report.html"
+    return report_path.name[: -len(suffix)] + "_mistakes.html" if report_path.name.endswith(suffix) else None
+
+
 def write_report(
     video: Path,
     results: list[CheckResult],
@@ -83,6 +89,7 @@ def write_report(
         results, evidence, title=title or video.stem, generated=generated,
         skipped=skipped, legibility=legibility, compliance=compliance,
         recommendations=recommendations, source_label=source_label,
+        mistakes_href=_mistakes_name(out_path),
     )
     out_path.write_text(document, encoding="utf-8")
     return out_path

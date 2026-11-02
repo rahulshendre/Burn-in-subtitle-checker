@@ -297,3 +297,18 @@ def test_a_missing_full_stop_is_not_highlighted_as_a_difference():
     assert "<mark" not in written and "<mark" not in heard
     written, heard = _diff_texts("हमारी बात", "हमारि बात।")
     assert "<mark" in written  # a real vowel difference is still marked
+
+
+def test_the_full_report_links_to_its_mistakes_page():
+    with_link = render_report([], FakeEvidence(), title="Demo", mistakes_href="clip_mistakes.html")
+    assert 'href="clip_mistakes.html"' in with_link and "See only the mistakes" in with_link
+    assert "See only the mistakes" not in render_report([], FakeEvidence(), title="Demo")
+
+
+def test_the_mistakes_page_name_follows_the_report_name():
+    from pathlib import Path
+
+    from subtitle_checker.report.evidence import _mistakes_name
+
+    assert _mistakes_name(Path("out/clip_report.html")) == "clip_mistakes.html"
+    assert _mistakes_name(Path("out/other.html")) is None

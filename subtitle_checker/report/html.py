@@ -89,6 +89,7 @@ def render_report(
     compliance: VideoCompliance | None = None,
     recommendations: list | None = None,
     source_label: str = "OCR",
+    mistakes_href: str | None = None,
 ) -> str:
     """Render check results into one self-contained HTML document.
 
@@ -111,7 +112,7 @@ def render_report(
 
     parts = [
         _head(title),
-        _summary(title, results, stamp),
+        _summary(title, results, stamp, mistakes_href),
         _legibility_banner(legibility),
         _compliance_banner(compliance),
         _flags_section(flags, evidence, source_label),
@@ -209,7 +210,9 @@ def _unchecked_suffix(n: int) -> str:
     return f" (and {_plural(n, 'line')} that could not be checked)" if n else ""
 
 
-def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
+def _summary(
+    title: str, results: list[CheckResult], stamp: str, mistakes_href: str | None = None
+) -> str:
     counts = {v: 0 for v in _VERDICT_ORDER}
     for r in results:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
@@ -234,12 +237,19 @@ def _summary(title: str, results: list[CheckResult], stamp: str) -> str:
         f"{_accuracy_bar(results)}"
         f'<p class="headline">{headline}</p>'
         f'<div class="chips">{chips}</div>'
+        f"{_mistakes_link(mistakes_href)}"
         "<p class=\"note\">Each card shows the video frame, the subtitle beside "
         "what the audio says, and a short audio clip to check. Small single-word errors "
         "are not flagged automatically - scan the two columns below to catch them. "
         f"{CONFIDENCE_EXPLAINED}</p>"
         "</header>"
     )
+
+
+def _mistakes_link(href: str | None) -> str:
+    if not href:
+        return ""
+    return f'<p class="mlink"><a href="{html.escape(href)}">See only the mistakes</a></p>'
 
 
 def _flags_section(
@@ -708,6 +718,7 @@ _STYLE = """<style>
   h2 { font-size:1.15rem; margin:2rem 0 .8rem; border-bottom:2px solid #2a6;
        padding-bottom:.3rem; }
   .sub { color:#777; margin:0 0 .8rem; font-size:.9rem; }
+  .mlink { margin:.3rem 0 .6rem; } .mlink a { font-weight:600; }
   .headline { font-weight:600; font-size:1.05rem; margin:.4rem 0; }
   .chips { margin:.5rem 0 1rem; }
   .chip { display:inline-block; color:#fff; border-radius:10px; padding:.1rem .6rem;
