@@ -113,7 +113,7 @@ def test_ok_rows_go_to_ledger_table():
 def test_one_confidence_number_shown_on_card():
     out = render_report(_sample(), FakeEvidence(), title="Demo")
     # the fused number is the only figure on the card; its inputs are not repeated
-    assert "Confidence 39%" in out
+    assert "Only 39% sure it is correct" in out
     assert "OCR 80%" not in out and "ASR 21%" not in out
 
 

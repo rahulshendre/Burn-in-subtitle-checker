@@ -298,7 +298,13 @@ def _score_html(r: CheckResult) -> str:
     """Card-head confidence: the one blended 0-100 number, or nothing when there is none."""
     if r.combined_score is None:
         return ""
-    return f'<span class="score" title="{_CONFIDENCE_HINT}">Confidence {r.combined_score:.0f}%</span>'
+    # On a flagged line a bare "Confidence 71%" reads as high certainty next to a
+    # red badge. "Only 71% sure it is correct" says the same number and why the
+    # line was flagged.
+    label = f"Confidence {r.combined_score:.0f}%" if r.verdict is Verdict.OK else (
+        f"Only {r.combined_score:.0f}% sure it is correct"
+    )
+    return f'<span class="score" title="{_CONFIDENCE_HINT}">{label}</span>'
 
 
 def _score_cell(r: CheckResult) -> str:

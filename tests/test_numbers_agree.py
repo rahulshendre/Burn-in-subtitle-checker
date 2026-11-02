@@ -123,7 +123,7 @@ def test_a_card_shows_one_number_and_the_inputs_are_not_repeated():
         card = re.search(r'<article class="card".*?</article>', page, re.S).group(0)
         text = _visible(card)
         assert text.count("%") == 1, text
-        assert "Confidence 57%" in text
+        assert "Only 57% sure it is correct" in text
         assert "match score" not in text
         assert "OCR" not in text and "ASR" not in text
 
