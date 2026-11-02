@@ -20,6 +20,9 @@ Use
    (top right).
 3. Choose a video, pick the language, click "Run check". Keep the page open;
    the bar shows how far it has got.
+   The tool reads the subtitles at the bottom of the picture, so a video with the
+   subtitles in the middle (for example a phone video with black bars) will show
+   speech with no subtitle.
 4. When the check is done, click "Open report". Old reports stay under
    "Past checks" (reload the page to see the newest one there).
 5. Click "Quit app" (top right) when you are finished.
