@@ -107,14 +107,16 @@ contains everything.
 
 ### Why there are so many branches
 
-- The upstream repo started with a single empty commit, so all of this reaches PlanetRead
-  as pull requests. One pull request with 160 commits cannot be reviewed, so the work was
+- The upstream repo has a single commit (a project config file), so all of this reaches
+  PlanetRead as pull requests. One pull request with 160 commits cannot be reviewed, so the work was
   built as a stack: each branch adds one idea with its tests and sits on the branch before it.
 - A problem found on real footage got its own branch instead of a rewrite of an earlier one
   (for example `feat/ocr-strip-logo` and `feat/asr-short-line-floor`), so the history shows
   what was found and why.
-- The branches are markers on one straight line, not 34 versions of the code. The tip,
-  `fix/user-testing-findings`, contains everything and nothing has to be merged between them.
+- The branches are markers along one history, not 34 versions of the code. The tip,
+  `fix/user-testing-findings`, contains everything. There is one small side branch point:
+  `feat/guideline-compliance`, `feat/asr-short-line-floor` and `feat/ocr-strip-logo` were
+  built side by side and are joined in `feat/legibility-recommendations`.
 - Commits are small, about 200 lines or fewer, so each one can be read on its own.
 - `demo/rahul-subtitle-mismatch` is not part of the stack. It is the small demo submission
   behind PlanetRead pull request #12.
