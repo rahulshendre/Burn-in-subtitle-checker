@@ -168,6 +168,7 @@ class Job:
     video: str = ""
     report: str = ""  # path relative to home, set when done
     error: str = ""
+    hint: str = ""  # a note shown with a finished report
     started: float = 0.0
     stage_started: float = 0.0
     duration: float = 0.0  # video length, drives the time estimate
@@ -194,6 +195,7 @@ class Job:
             "video": self.video,
             "report": self.report,
             "error": self.error,
+            "hint": self.hint,
             "elapsed": int(now - self.started) if self.started else 0,
         }
 
@@ -236,6 +238,7 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
         report = out_dir / f"{video.stem}_report.html"
         if code == 0 and report.exists():
             job.report = report.relative_to(home).as_posix()
+            job.hint = language_hint(out_dir, video, lang)
             job.state = "done"
         else:
             job.state, job.error = "error", plain_exit_message(job.log)
@@ -269,6 +272,38 @@ def clear_leftovers(home: Path) -> None:
         for folder in runs.iterdir():
             if folder.is_dir() and not any(folder.glob("*_report.html")):
                 shutil.rmtree(folder, ignore_errors=True)
+
+
+_MIN_LINES_FOR_HINT = 5
+_MOST_FLAGGED = 0.7
+
+
+def language_hint(out_dir: Path, video: Path, lang: str) -> str:
+    """A note for a report where almost every line was flagged, else an empty string.
+
+    That pattern is what choosing the wrong language looks like: the speech is
+    read in one language and compared with subtitles written in another. A real
+    run of mostly bad subtitles looks the same, so the note only asks the user
+    to check, it does not claim the language is wrong.
+    """
+    from subtitle_checker.artifacts import load_artifact
+    from subtitle_checker.report.html import accuracy_stats
+
+    try:
+        _, results = load_artifact(out_dir / f"{video.stem}_check_results.json")
+    except (OSError, ValueError, KeyError):
+        return ""
+    stats = accuracy_stats(results)
+    if stats["checkable"] < _MIN_LINES_FOR_HINT:
+        return ""
+    if stats["flagged"] / stats["checkable"] < _MOST_FLAGGED:
+        return ""
+    other = "Marathi" if lang == "hi" else "Hindi"
+    return (
+        f"Most lines were flagged ({stats['flagged']} of {stats['checkable']}). "
+        f"This check was run as {LANGUAGES.get(lang, lang)}. "
+        f"If the video is in {other}, choose {other} and run it again."
+    )
 
 
 def past_runs(home: Path) -> list[dict]:
@@ -382,6 +417,8 @@ _APP_STYLE = """<style>
   .when { float:right; color:#889; font-size:.8rem; }
   .quit { background:transparent; border:1px solid rgba(255,255,255,.6); font-weight:400; }
   .barbtns { display:flex; gap:.6rem; }
+  .hint { margin:.6rem 0 0; padding:.5rem .7rem; background:#fff6dd; color:#6b4e00;
+    border-radius:6px; font-size:.9rem; }
   .keymsg { margin:.5rem 0 0; font-size:.85rem; color:#8a1f1f; min-height:1.1rem; }
 </style>"""
 
@@ -422,6 +459,7 @@ function poll(){fetch('/job').then(function(r){return r.json();}).then(function(
   if(j.state==='running'){bar(j.percent,j.stage+1,'&middot; '+mins(j.left)+' left (estimate)'
     +' &middot; keep this page open');setTimeout(poll,1000);}
   else if(j.state==='done'){bar(100,STEPS.length,'Done.');
+    if(j.hint){box.insertAdjacentHTML('beforeend','<p class="hint">'+esc(j.hint)+'</p>');}
     box.insertAdjacentHTML('beforeend','<a class="openreport" href="/file/'+encodeURI(j.report)
       +'" target="_blank" rel="noopener">Open report</a>');$('run').disabled=false;}
   else if(j.state==='error'){fail(j.error);}});}

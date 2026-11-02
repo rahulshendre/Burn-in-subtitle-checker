@@ -405,3 +405,37 @@ def test_an_unreadable_video_is_not_called_silent(tmp_path, monkeypatch):
 
     monkeypatch.setattr(app.subprocess, "run", boom)
     assert app.has_audio(tmp_path / "broken.mp4") is True  # it gets the "can't be read" message
+
+
+def _saved_results(folder, verdicts):
+    from subtitle_checker.artifacts import CheckResult, save_artifact
+
+    results = [
+        CheckResult(float(i), float(i) + 1.0, verdict, "r", subtitle_text="टेक्स्ट")
+        for i, verdict in enumerate(verdicts)
+    ]
+    folder.mkdir(parents=True, exist_ok=True)
+    save_artifact(folder / "clip_check_results.json", "check_results", results)
+
+
+def test_a_report_with_almost_every_line_flagged_asks_to_check_the_language(tmp_path):
+    from subtitle_checker.artifacts import Verdict
+
+    _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 8)
+    note = app.language_hint(tmp_path, tmp_path / "clip.mp4", "mr")
+    assert "8 of 8" in note and "Marathi" in note and "choose Hindi" in note
+
+
+def test_a_normal_report_gets_no_language_hint(tmp_path):
+    from subtitle_checker.artifacts import Verdict
+
+    _saved_results(tmp_path, [Verdict.OK] * 6 + [Verdict.TEXT_MISMATCH] * 2)
+    assert app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi") == ""
+
+
+def test_a_very_short_report_gets_no_language_hint(tmp_path):
+    from subtitle_checker.artifacts import Verdict
+
+    _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 3)
+    assert app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi") == ""
+    assert app.language_hint(tmp_path / "nothing", tmp_path / "clip.mp4", "hi") == ""
