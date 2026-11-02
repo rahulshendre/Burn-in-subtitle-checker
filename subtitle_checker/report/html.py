@@ -718,6 +718,7 @@ _STYLE = """<style>
   h2 { font-size:1.15rem; margin:2rem 0 .8rem; border-bottom:2px solid #2a6;
        padding-bottom:.3rem; }
   .sub { color:#777; margin:0 0 .8rem; font-size:.9rem; }
+  .ledger { overflow-x:auto; }  /* a wide table scrolls inside itself, not the page */
   .mlink { margin:.3rem 0 .6rem; } .mlink a { font-weight:600; }
   .headline { font-weight:600; font-size:1.05rem; margin:.4rem 0; }
   .chips { margin:.5rem 0 1rem; }

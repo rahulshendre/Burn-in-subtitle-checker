@@ -312,3 +312,8 @@ def test_the_mistakes_page_name_follows_the_report_name():
 
     assert _mistakes_name(Path("out/clip_report.html")) == "clip_mistakes.html"
     assert _mistakes_name(Path("out/other.html")) is None
+
+
+def test_a_wide_table_scrolls_inside_itself_not_the_page():
+    out = render_report([], FakeEvidence(), title="Demo")
+    assert ".ledger { overflow-x:auto; }" in out
