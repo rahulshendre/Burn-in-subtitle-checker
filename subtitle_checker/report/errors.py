@@ -21,6 +21,10 @@ VIDEO_UNREADABLE = "This video file can't be read. Try exporting it again as MP4
 VIDEO_TOO_SLOW = (
     "Reading this video took too long. Try exporting it again as MP4, or use a shorter video."
 )
+NO_SOUND = (
+    "This video has no sound, so there is nothing to compare the subtitles with. "
+    "Choose a video that has sound."
+)
 NO_INTERNET = "Couldn't reach Sarvam. Check your internet connection and try again."
 SARVAM_BUSY = "Sarvam is busy right now. Wait a minute and try again."
 SARVAM_DOWN = "Sarvam had a problem on its side. Try again in a few minutes."

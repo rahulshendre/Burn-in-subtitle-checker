@@ -22,6 +22,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -33,7 +34,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-from subtitle_checker.report.errors import plain_error, plain_exit_message, record_failure
+from subtitle_checker.report.errors import (
+    NO_SOUND,
+    plain_error,
+    plain_exit_message,
+    record_failure,
+)
 from subtitle_checker.report.keycheck import check_key
 from subtitle_checker.report.webui import _STYLE, discover_reports
 
@@ -91,6 +97,19 @@ def video_duration(video: Path) -> float:
         return probe(video).duration
     except Exception:  # an unreadable file fails later with a clearer message
         return 0.0
+
+
+def has_audio(video: Path) -> bool:
+    """False only when the file can be read and has no sound track."""
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+             "stream=index", "-of", "csv=p=0", str(video)],
+            capture_output=True, text=True, check=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True  # an unreadable file fails later with its own message
+    return bool(proc.stdout.strip())
 
 
 def default_home() -> Path:
@@ -491,6 +510,10 @@ def _make_handler(home: Path, job: Job, lock: threading.Lock) -> type[BaseHTTPRe
                 return
             if not video.is_file():
                 self._send(400, b"The video did not upload. Try again.", "text/plain")
+                return
+            if not has_audio(video):
+                video.unlink(missing_ok=True)
+                self._send(400, NO_SOUND.encode("utf-8"), "text/plain")
                 return
             with lock:
                 if job.state == "running":
