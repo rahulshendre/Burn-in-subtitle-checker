@@ -29,6 +29,7 @@ import time
 import unicodedata
 import urllib.request
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -610,8 +611,12 @@ def serve_app(
     host: str = "127.0.0.1",
     port: int = 8000,
     open_browser: bool = True,
+    ready: Callable[[ThreadingHTTPServer], None] | None = None,
 ) -> None:
-    """Run the app on this machine until interrupted."""
+    """Run the app on this machine until interrupted.
+
+    `ready` is called with the server once it is listening, so a caller can stop it later.
+    """
     home = home or default_home()
     home.mkdir(parents=True, exist_ok=True)
     load_key(home)
@@ -627,6 +632,8 @@ def serve_app(
     # Only now: a second copy that just shows the running app must not clear
     # the first copy's upload or the run it is working on.
     clear_leftovers(home)
+    if ready is not None:
+        ready(httpd)
     print(f"Subtitle Checker running at {url}  (files in {home})")
     print("Stop it with the Quit app button on the page (or Ctrl+C here).")
     if open_browser:

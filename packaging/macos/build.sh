@@ -17,7 +17,8 @@ if [ ! -x "$WORK/venv/bin/pyinstaller" ]; then
   "$PY" -m venv "$WORK/venv"
   "$WORK/venv/bin/pip" install -q --upgrade pip
 fi
-"$WORK/venv/bin/pip" install -q "$ROOT[asr,vision,audio]" pyinstaller
+# pyobjc lets the app answer the Dock's Quit and Cmd-Q (see launcher.py).
+"$WORK/venv/bin/pip" install -q "$ROOT[asr,vision,audio]" pyinstaller pyobjc-framework-Cocoa
 # The version number never changes, so pip keeps a copy of the project left in a
 # reused venv by an earlier build. Replace it so the app is built from this source.
 "$WORK/venv/bin/pip" install -q --force-reinstall --no-deps "$ROOT"
