@@ -20,7 +20,8 @@ Use
    the bar shows how far it has got.
 4. When the check is done, click "Open report". Old reports stay under
    "Past checks" (reload the page to see the newest one there).
-5. Click "Quit app" (top right) when you are finished.
+5. Click "Quit app" (top right) when you are finished. Choosing Quit from the
+   Dock icon's menu closes it too.
 
 Where things are: your reports are in the "Subtitle Checker" folder in your
 home folder. The page explains most problems in plain words. If it says

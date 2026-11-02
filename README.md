@@ -49,7 +49,8 @@ suggested correction.
     `Subtitle-Checker-Setup.exe`, installs it on a Windows runner, checks that
     the installed app starts and serves the current page, and attaches the
     installer to the run. `packaging/windows/build.ps1` does the same build by hand.
-  - The packaged app uses port 8000; set `SUBTITLE_CHECKER_PORT` to use another.
+  - The packaged app uses port 8000. If another program holds it, the app takes the
+    next free port; set `SUBTITLE_CHECKER_PORT` to start the search somewhere else.
 - **Command line.**
 
   ```bash
