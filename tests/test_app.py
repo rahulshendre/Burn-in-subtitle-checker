@@ -361,3 +361,24 @@ def test_a_second_copy_shows_the_running_app_instead_of_starting(tmp_path):
     finally:
         first.shutdown()
         first.server_close()
+
+
+def test_leftovers_of_an_unfinished_check_are_cleared(tmp_path):
+    (tmp_path / "uploads").mkdir()
+    (tmp_path / "uploads" / "clip.mp4").write_bytes(b"x" * 10)
+    unfinished = tmp_path / "runs" / "clip_20261102-100000"
+    unfinished.mkdir(parents=True)
+    (unfinished / "frames.tmp").write_bytes(b"x")
+    done = tmp_path / "runs" / "other_20261102-090000"
+    done.mkdir()
+    (done / "other_report.html").write_text("<html></html>")
+
+    app.clear_leftovers(tmp_path)
+
+    assert list((tmp_path / "uploads").iterdir()) == []
+    assert not unfinished.exists()
+    assert (done / "other_report.html").is_file()  # a finished report is never touched
+
+
+def test_clearing_leftovers_works_when_the_folders_do_not_exist(tmp_path):
+    app.clear_leftovers(tmp_path)  # a brand new install has no uploads or runs yet

@@ -21,6 +21,7 @@ import html
 import io
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -229,6 +230,26 @@ def run_check(job: Job, home: Path, video: Path, srt: Path | None, lang: str) ->
         for upload in (video, srt):
             if upload is not None:
                 upload.unlink(missing_ok=True)
+
+
+def clear_leftovers(home: Path) -> None:
+    """Remove what a check that never finished left behind.
+
+    Quitting in the middle of a check skips the cleanup at the end of run_check,
+    so the uploaded copy of the video and an unfinished run folder stay on the
+    disk. Nothing runs when this is called at start-up, and at quit the process
+    is about to end, so everything unfinished can go.
+    """
+    uploads = home / "uploads"
+    if uploads.is_dir():
+        for item in uploads.iterdir():
+            if item.is_file():
+                item.unlink(missing_ok=True)
+    runs = home / "runs"
+    if runs.is_dir():
+        for folder in runs.iterdir():
+            if folder.is_dir() and not any(folder.glob("*_report.html")):
+                shutil.rmtree(folder, ignore_errors=True)
 
 
 def past_runs(home: Path) -> list[dict]:
@@ -542,6 +563,9 @@ def serve_app(
         if open_browser:
             webbrowser.open(url)
         return
+    # Only now: a second copy that just shows the running app must not clear
+    # the first copy's upload or the run it is working on.
+    clear_leftovers(home)
     print(f"Subtitle Checker running at {url}  (files in {home})")
     print("Stop it with the Quit app button on the page (or Ctrl+C here).")
     if open_browser:
@@ -552,3 +576,4 @@ def serve_app(
         pass
     finally:
         httpd.server_close()
+        clear_leftovers(home)
