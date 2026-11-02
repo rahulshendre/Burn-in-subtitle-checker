@@ -76,7 +76,7 @@ Extras: `audio` (voice activity detection on onnxruntime), `asr` and `vision`
 
 ## Status
 
-Hindi and Marathi work end to end. 394 tests pass on macOS and on Windows (CI).
+Hindi and Marathi work end to end. 418 tests pass on macOS and on Windows (CI).
 
 This branch is the tip of a stack of reviewable branches. The branch-by-branch
 map is in the README on the fork's `main`.
