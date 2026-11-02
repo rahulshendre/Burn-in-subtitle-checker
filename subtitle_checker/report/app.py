@@ -21,10 +21,10 @@ import html
 import io
 import json
 import os
-import re
 import sys
 import threading
 import time
+import unicodedata
 import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -120,8 +120,14 @@ def save_key(home: Path, key: str) -> None:
 def safe_name(name: str) -> str:
     """Reduce an uploaded filename to a plain, safe file name."""
     base = Path(name.replace("\\", "/")).name
-    base = re.sub(r"[^\w.\- ]", "_", base).strip(" .")
-    return base or "upload"
+    # Letters and digits stay, and so do the vowel signs of Indian scripts: they
+    # are combining marks, not letters, and dropping them garbles a Hindi name.
+    keep = "".join(
+        c if c.isalnum() or c in "_.- \u200c\u200d" or unicodedata.category(c).startswith("M")
+        else "_"
+        for c in base
+    )
+    return keep.strip(" .") or "upload"
 
 
 def resolve_inside(home: Path, rel: str) -> Path | None:

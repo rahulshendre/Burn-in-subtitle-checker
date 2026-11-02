@@ -24,6 +24,10 @@ def test_safe_name_strips_paths_and_odd_characters():
     assert safe_name("") == "upload"
 
 
+def test_safe_name_keeps_the_vowel_signs_of_a_hindi_name():
+    assert safe_name("मेरा वीडियो (final) v2.mp4") == "मेरा वीडियो _final_ v2.mp4"
+
+
 def test_resolve_inside_refuses_paths_outside_home(tmp_path):
     home = tmp_path / "home"
     (home / "runs").mkdir(parents=True)
