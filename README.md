@@ -105,6 +105,42 @@ contains everything.
 | 33 | `feat/usability-fixes` | fixes from a usability review: Open report button, API key check and Change API key, plain error messages, plain-word reports, one confidence number; Mac and Windows apps rebuilt |
 | 34 | `fix/user-testing-findings` | fixes from user testing of the Mac app (72 cases): free-port fallback, plain messages for no-sound videos and photos, Hindi file names kept intact, leftovers cleared after quitting, a wrong-language note, Dock Quit and Cmd-Q, Open folder button, Past checks refresh (current tip) |
 
+### Why there are so many branches
+
+- The upstream repo started with a single empty commit, so all of this reaches PlanetRead
+  as pull requests. One pull request with 160 commits cannot be reviewed, so the work was
+  built as a stack: each branch adds one idea with its tests and sits on the branch before it.
+- A problem found on real footage got its own branch instead of a rewrite of an earlier one
+  (for example `feat/ocr-strip-logo` and `feat/asr-short-line-floor`), so the history shows
+  what was found and why.
+- The branches are markers on one straight line, not 34 versions of the code. The tip,
+  `fix/user-testing-findings`, contains everything and nothing has to be merged between them.
+- Commits are small, about 200 lines or fewer, so each one can be read on its own.
+- `demo/rahul-subtitle-mismatch` is not part of the stack. It is the small demo submission
+  behind PlanetRead pull request #12.
+
+### Pull request plan
+
+34 pull requests would be too many to review. The plan is nine, in this order. Each is
+opened from an existing branch tip against the tip of the one before it (the first against
+`main`), so no branch has to be rewritten or deleted. When one is merged, the next is
+retargeted to `main`.
+
+| PR | Branches | Tip branch | What the reviewer gets |
+|---:|----------|------------|------------------------|
+| 1 | 1-2 | `feat/eval-harness` | package layout, artifacts, CLI, CI; the error injector and scoring harness |
+| 2 | 3-6 | `feat/report` | the four stages: subtitle detection and OCR, audio regions, forced alignment and ASR cross-check, the HTML report |
+| 3 | 7-10 | `feat/align-rescue` | OCR cleanup (junk boxes, channel logos) and measuring how many lines get verified |
+| 4 | 11-14 | `feat/saaras-v3-asr` | local web viewer, Sarvam Vision OCR, matra-swap injection, Saaras v3 ASR |
+| 5 | 15-18 | `feat/legibility-hide-clear` | one combined score per line, legibility score and grade, guard against unreadable OCR |
+| 6 | 19-22 | `feat/legibility-recommendations` | guideline compliance, short-line and logo fixes, legibility tips |
+| 7 | 23-28 | `feat/short-line-uncheckable` | SRT check without OCR, Saaras v4, mistakes-only page, suggested text, accuracy numbers |
+| 8 | 29-31 | `feat/windows-app` | Marathi, the desktop app, the Windows installer |
+| 9 | 32-34 | `fix/user-testing-findings` | hardening, the usability fixes and the user testing fixes |
+
+`feat/saaras-v3-asr` (PR 4) is replaced by `feat/saaras-v4-asr` (PR 7). Both stay so the
+history is true; the two could be folded into one pull request when they are opened.
+
 ## Development
 
 ```bash
