@@ -439,3 +439,9 @@ def test_a_very_short_report_gets_no_language_hint(tmp_path):
     _saved_results(tmp_path, [Verdict.TEXT_MISMATCH] * 3)
     assert app.language_hint(tmp_path, tmp_path / "clip.mp4", "hi") == ""
     assert app.language_hint(tmp_path / "nothing", tmp_path / "clip.mp4", "hi") == ""
+
+
+def test_two_checks_in_the_same_minute_show_different_times():
+    first = app._fmt_when(1_700_000_000.0)
+    second = app._fmt_when(1_700_000_030.0)
+    assert first != second and first.count(":") == 2

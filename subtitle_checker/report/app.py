@@ -324,7 +324,7 @@ def past_runs(home: Path) -> list[dict]:
 
 
 def _fmt_when(ts: float) -> str:
-    return time.strftime("%d %b %Y, %H:%M", time.localtime(ts))
+    return time.strftime("%d %b %Y, %H:%M:%S", time.localtime(ts))
 
 
 def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checker") -> str:
