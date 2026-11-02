@@ -450,3 +450,9 @@ def test_two_checks_in_the_same_minute_show_different_times():
 def test_the_change_key_box_can_be_cancelled_only_when_a_key_is_saved():
     assert 'id="cancelkey"' in render_app([], has_key=True)
     assert 'id="cancelkey"' not in render_app([], has_key=False)  # nothing to go back to
+
+
+def test_the_first_screen_says_what_the_tool_does_and_what_the_key_is_for():
+    page = render_app([], has_key=False)
+    assert "match what is said in it" in page
+    assert "Sarvam is the service that reads the subtitles" in page

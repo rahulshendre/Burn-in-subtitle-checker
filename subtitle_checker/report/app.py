@@ -351,7 +351,8 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         "<h2>Sarvam API key</h2>"
         '<p class="muted">'
         + ("Paste a new key to replace the saved one." if has_key
-           else "Needed once. It is saved on this computer only.")
+           else "Needed once. Sarvam is the service that reads the subtitles and the speech. "
+           "Use the key you were given for it; it is saved on this computer only.")
         + "</p>"
         '<div class="row"><input id="key" type="password" placeholder="Paste the key">'
         '<button id="savekey">Save</button>'
@@ -367,6 +368,8 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         '<main class="wrap">'
         + key_card
         + '<section class="card"><h2>New check</h2>'
+        '<p class="muted small">Checks that the subtitles burned into a video match what is '
+        "said in it, and lists the lines that do not.</p>"
         '<label class="lbl" for="video">Video</label>'
         '<input id="video" type="file" accept="video/*">'
         '<label class="lbl" for="srt">Subtitle file (optional)</label>'
