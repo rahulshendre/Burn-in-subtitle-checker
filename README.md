@@ -42,8 +42,10 @@ suggested correction.
   save it, and the "Change API key" button replaces it later), pick a video and
   the language, run the check, then click "Open report". Failures are explained
   in plain words, and the full error goes to `app.log` in the app's
-  `Subtitle Checker` folder. The video stays on the computer; only cropped
-  subtitle images and short audio clips go to Sarvam.
+  `Subtitle Checker` folder (the "Open folder" button shows it). The video stays on
+  the computer; only cropped subtitle images and short audio clips go to Sarvam.
+  A note appears when almost every line is flagged, because a wrong language
+  setting looks like that. On the Mac, Quit from the Dock menu and Cmd-Q close the app.
   - Mac (Apple Silicon): `packaging/macos/build.sh` builds `Subtitle Checker.app`.
   - Windows (64-bit): the `windows` GitHub Actions workflow builds
     `Subtitle-Checker-Setup.exe`, installs it on a Windows runner, checks that

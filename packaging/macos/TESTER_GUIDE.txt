@@ -22,12 +22,13 @@ Use
    subtitles in the middle (for example a phone video with black bars) will show
    speech with no subtitle.
 4. When the check is done, click "Open report". Old reports stay under
-   "Past checks" (reload the page to see the newest one there).
+   "Past checks"; the new one is added there when the check finishes. If the
+   page says most lines were flagged, check that the language is the right one.
 5. Click "Quit app" (top right) when you are finished. Choosing Quit from the
    Dock icon's menu closes it too.
 
 Where things are: your reports are in the "Subtitle Checker" folder in your
-home folder. The page explains most problems in plain words. If it says
+home folder. The "Open folder" button (top right) opens it. The page explains most problems in plain words. If it says
 "Something went wrong", send the app.log file from that folder.
 
 Privacy: the video stays on your computer. Only small cropped subtitle images
