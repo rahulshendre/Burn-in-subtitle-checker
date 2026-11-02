@@ -456,3 +456,10 @@ def test_the_first_screen_says_what_the_tool_does_and_what_the_key_is_for():
     page = render_app([], has_key=False)
     assert "match what is said in it" in page
     assert "Sarvam is the service that reads the subtitles" in page
+
+
+def test_past_checks_refresh_when_a_check_finishes_without_reloading():
+    page = render_app([{"label": "clip", "report": "runs/a/clip_report.html", "mistakes": "",
+                        "when": 1_700_000_000.0}], has_key=True)
+    assert '<div id="runs">' in page and "clip" in page
+    assert "refreshRuns();" in page  # the finished-check branch calls it

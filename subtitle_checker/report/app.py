@@ -383,7 +383,7 @@ def render_app(runs: list[dict], *, has_key: bool, title: str = "Subtitle Checke
         f'<div class="row"><button id="run"{"" if has_key else " disabled"}>Run check</button></div>'
         '<div id="status" class="status" hidden></div>'
         "</section>"
-        f'<section class="card"><h2>Past checks</h2>{history}</section>'
+        f'<section class="card"><h2>Past checks</h2><div id="runs">{history}</div></section>'
         "</main>"
         f"<script>{_SCRIPT}</script>"
     )
@@ -464,10 +464,13 @@ function upload(file,onpct){return new Promise(function(ok,no){
   x.upload.onprogress=function(e){if(e.lengthComputable){onpct(e.loaded/e.total);}};
   x.onload=function(){x.status===200?ok(x.responseText):no(new Error('Upload failed.'));};
   x.onerror=function(){no(new Error('Upload failed.'));}; x.send(file);});}
+function refreshRuns(){fetch('/').then(function(r){return r.text();}).then(function(t){
+  var d=new DOMParser().parseFromString(t,'text/html').getElementById('runs');
+  if(d&&$('runs')){$('runs').innerHTML=d.innerHTML;}});}
 function poll(){fetch('/job').then(function(r){return r.json();}).then(function(j){
   if(j.state==='running'){bar(j.percent,j.stage+1,'&middot; '+mins(j.left)+' left (estimate)'
     +' &middot; keep this page open');setTimeout(poll,1000);}
-  else if(j.state==='done'){bar(100,STEPS.length,'Done.');
+  else if(j.state==='done'){bar(100,STEPS.length,'Done.');refreshRuns();
     if(j.hint){box.insertAdjacentHTML('beforeend','<p class="hint">'+esc(j.hint)+'</p>');}
     box.insertAdjacentHTML('beforeend','<a class="openreport" href="/file/'+encodeURI(j.report)
       +'" target="_blank" rel="noopener">Open report</a>');$('run').disabled=false;}
