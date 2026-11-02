@@ -1,5 +1,5 @@
 # Windows check and build (no Windows machine needed). Runs on every push to
-# feat/windows-app and feat/usability-fixes, or by hand from the Actions tab once this file is on the
+# feat/windows-app, feat/usability-fixes and fix/user-testing-findings, or by hand from the Actions tab once this file is on the
 # default branch. The tests and the build run side by side: the build makes
 # Subtitle-Checker-Setup.exe, installs it silently, checks the app starts and
 # serves its page, and attaches the installer to the run as an artifact.
@@ -7,7 +7,7 @@ name: windows
 
 on:
   push:
-    branches: [feat/windows-app, feat/usability-fixes]
+    branches: [feat/windows-app, feat/usability-fixes, fix/user-testing-findings]
   workflow_dispatch:
     inputs:
       package:
@@ -65,8 +65,8 @@ jobs:
           Get-Content "$HOME\Subtitle Checker\app.log" -ErrorAction SilentlyContinue
           if (-not $ok) { throw "The app did not answer on http://127.0.0.1:8000/" }
           # The page must come from the current source: these only exist in the
-          # build with the key check and the Open report button.
-          foreach ($marker in 'id="keymsg"', 'class="openreport"') {
+          # build with the key check, the Open report button and the Open folder button.
+          foreach ($marker in 'id="keymsg"', 'class="openreport"', 'id="openfolder"') {
             if (-not $page.Contains($marker)) { throw "The installed app is missing $marker" }
           }
       - uses: actions/upload-artifact@v4
